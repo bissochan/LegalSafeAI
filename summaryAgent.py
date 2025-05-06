@@ -70,37 +70,105 @@ class ContractAnalyzerAgent:
             "Content-Type": "application/json"
         }
         
-        prompt = f"""
-        Analyze this contract and provide a complete analysis. For each section, include a score (1-10) in parentheses at the end of the analysis.
+        prompt = f"""Analyze this employment contract. You must respond using EXACTLY this format:
 
-        Format each section as follows:
-        field_name: <detailed analysis> (Punteggio: X)
+        GENERAL_SUMMARY:
+        [Write a comprehensive overview here]
+        END_SUMMARY
 
-        Include analysis for:
-        - sick_leave
-        - vacation
-        - overtime
-        - termination
-        - confidentiality
-        - non_compete
-        - intellectual_property
-        - governing_law
-        - jurisdiction
-        - dispute_resolution
-        - liability
-        - salary
-        - benefits
-        - work_hours
-        - performance_evaluation
-        - duties
-        - responsibilities
+        FIELD_ANALYSIS:
+        sick_leave:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
 
-        End with an overall score:
-        overall_score: X
+        vacation:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
 
-        Then provide:
-        EXECUTIVE SUMMARY:
-        ...
+        overtime:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        termination:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        confidentiality:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        non_compete:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        intellectual_property:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        governing_law:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        jurisdiction:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        dispute_resolution:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        liability:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        salary:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        benefits:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        work_hours:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        performance_evaluation:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        duties:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        responsibilities:
+        CONTENT: [detailed explanation]
+        SCORE: [number 1-10]
+        END_FIELD
+
+        OVERALL_ASSESSMENT:
+        SCORE: [number 1-10]
+        EXECUTIVE_SUMMARY: [final summary]
+        KEY_POINTS: [bullet points separated by |]
+        POTENTIAL_ISSUES: [bullet points separated by |]
+        RECOMMENDATIONS: [bullet points separated by |]
+        END_ASSESSMENT
 
         Contract to analyze:
         {contract}
@@ -109,7 +177,7 @@ class ContractAnalyzerAgent:
         data = {
             "model": "google/gemini-2.0-flash-001",
             "messages": [
-                {"role": "system", "content": "You are a legal expert analyzing employment contracts."},
+                {"role": "system", "content": "You are an expert legal analyst specialized in employment contracts. Provide detailed, structured analysis."},
                 {"role": "user", "content": prompt}
             ]
         }
@@ -121,8 +189,9 @@ class ContractAnalyzerAgent:
             
             if "choices" in result and len(result["choices"]) > 0:
                 content = result["choices"][0]["message"]["content"]
+                # Add debug print to see raw API response
+                print("Raw API response:", content)
                 analysis_result = self._parse_response(content)
-                self.save_analysis(analysis_result, contract_name)
                 return analysis_result
             else:
                 raise ValueError("No valid response from API")
@@ -132,140 +201,139 @@ class ContractAnalyzerAgent:
             raise
 
     def _parse_response(self, content: str) -> ContractAnalysisResult:
-        """Parse the API response into a ContractAnalysisResult object."""
-        structured_data = {}
+        """Parse the API response using regex for more reliable extraction."""
+        import re
         
-        # Split the content into structured and narrative parts
-        parts = content.split("EXECUTIVE SUMMARY:")
-        
-        # Parse structured analysis
-        for line in parts[0].strip().split('\n'):
-            if ':' in line:
-                key, value = line.split(':', 1)
-                key = key.strip().lower().replace(' ', '_')
-                value = value.strip()
+        # Initialize default fields
+        default_fields = {
+            'sick_leave': ContractField(content="", score=None),
+            'vacation': ContractField(content="", score=None),
+            'overtime': ContractField(content="", score=None),
+            'termination': ContractField(content="", score=None),
+            'confidentiality': ContractField(content="", score=None),
+            'non_compete': ContractField(content="", score=None),
+            'intellectual_property': ContractField(content="", score=None),
+            'governing_law': ContractField(content="", score=None),
+            'jurisdiction': ContractField(content="", score=None),
+            'dispute_resolution': ContractField(content="", score=None),
+            'liability': ContractField(content="", score=None),
+            'salary': ContractField(content="", score=None),
+            'benefits': ContractField(content="", score=None),
+            'work_hours': ContractField(content="", score=None),
+            'performance_evaluation': ContractField(content="", score=None),
+            'duties': ContractField(content="", score=None),
+            'responsibilities': ContractField(content="", score=None),
+        }
+
+        try:
+            # Parse overall assessment
+            overall_pattern = r'OVERALL_ASSESSMENT:\s*SCORE:\s*(\d+)\s*EXECUTIVE_SUMMARY:\s*(.*?)\s*KEY_POINTS:\s*(.*?)\s*POTENTIAL_ISSUES:\s*(.*?)\s*RECOMMENDATIONS:\s*(.*?)\s*END_ASSESSMENT'
+            overall_match = re.search(overall_pattern, content, re.DOTALL)
+            
+            if not overall_match:
+                raise ValueError("Failed to parse OVERALL_ASSESSMENT section")
                 
-                if key == 'overall_score':
-                    try:
-                        structured_data[key] = int(value)
-                    except ValueError:
-                        structured_data[key] = None
-                    continue
+            overall_score = int(overall_match.group(1))
+            exec_summary = overall_match.group(2).strip()
+            key_points = overall_match.group(3).strip()
+            potential_issues = overall_match.group(4).strip()
+            recommendations = overall_match.group(5).strip()
+
+            # Parse field analysis
+            field_pattern = r'(\w+):\s*CONTENT:\s*(.*?)\s*SCORE:\s*(\d+)\s*END_FIELD'
+            field_matches = re.finditer(field_pattern, content, re.DOTALL)
+            
+            fields_found = 0
+            for match in field_matches:
+                field_name = match.group(1).lower().strip()
+                content_text = match.group(2).strip()
+                score = int(match.group(3))
                 
-                # Extract score if present (format: "... (Punteggio: X)")
-                score = None
-                content_value = value
-                if "(Punteggio:" in value:
-                    content_part, score_part = value.rsplit("(Punteggio:", 1)
-                    try:
-                        score = int(score_part.strip(" )"))
-                        content_value = content_part.strip()
-                    except ValueError:
-                        pass
-                
-                if key in ContractAnalysis.model_fields and key != 'overall_score':
-                    structured_data[key] = ContractField(
-                        content=content_value,
+                if field_name in default_fields:
+                    default_fields[field_name] = ContractField(
+                        content=content_text,
                         score=score
                     )
-
-        # Initialize summary parts with empty strings
-        summary_parts = {
-            "executive_summary": "",
-            "key_points": "",
-            "potential_issues": "",
-            "recommendations": ""
-        }
-        
-        # Parse narrative summary if it exists
-        if len(parts) > 1:
-            summary_text = parts[1]
-            current_section = "executive_summary"
+                    fields_found += 1
             
-            for line in summary_text.split('\n'):
-                if "KEY POINTS:" in line:
-                    current_section = "key_points"
-                    continue
-                elif "POTENTIAL ISSUES:" in line:
-                    current_section = "potential_issues"
-                    continue
-                elif "RECOMMENDATIONS:" in line:
-                    current_section = "recommendations"
-                    continue
-                
-                if current_section in summary_parts:
-                    summary_parts[current_section] += line + "\n"
-        
-        # Clean up the summary parts
-        for key in summary_parts:
-            summary_parts[key] = summary_parts[key].strip()
-        
-        # Create the final result with proper ContractField instances
-        analysis_data = {}
-        for field in ContractAnalysis.model_fields:
-            if field == 'overall_score':
-                analysis_data[field] = structured_data.get(field)
-            else:
-                field_data = structured_data.get(field, {})
-                analysis_data[field] = ContractField(
-                    content=field_data.get('content', ''),
-                    score=field_data.get('score')
+            if fields_found == 0:
+                print("Warning: No fields found in FIELD_ANALYSIS")
+
+            return ContractAnalysisResult(
+                structured_analysis=ContractAnalysis(
+                    **default_fields,
+                    overall_score=overall_score
+                ),
+                summary=ContractSummary(
+                    executive_summary=exec_summary,
+                    key_points=key_points.replace("|", "\n"),
+                    potential_issues=potential_issues.replace("|", "\n"),
+                    recommendations=recommendations.replace("|", "\n")
                 )
-        
-        return ContractAnalysisResult(
-            structured_analysis=ContractAnalysis(**analysis_data),
-            summary=ContractSummary(**summary_parts)
-        )
+            )
+        except Exception as e:
+            print(f"Error parsing response: {e}")
+            print("Raw content:")
+            print(content)
+            raise
 
     def save_analysis(self, analysis_result: ContractAnalysisResult, contract_name: str = None):
-        """
-        Save the complete analysis results to a JSON file with scores.
-        """
+        """Save the complete analysis results to a JSON file."""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"analysis_{timestamp}.json"
         if contract_name:
             safe_name = "".join(c for c in contract_name if c.isalnum() or c in (' ', '-', '_')).rstrip()
             filename = f"{safe_name}_{timestamp}.json"
 
-        # Create detailed analysis with scores
-        detailed_fields = {}
-        structured = analysis_result.structured_analysis
-        
-        for field_name, field in structured.model_fields.items():
-            value = getattr(structured, field_name)
-            if value is not None:
-                if field_name == 'overall_score':
-                    detailed_fields[field_name] = {
-                        "score": value,
-                        "content": f"Overall contract score: {value}/10"
-                    }
-                else:
-                    detailed_fields[field_name] = {
-                        "score": value.score if hasattr(value, 'score') else None,
-                        "content": value.content if hasattr(value, 'content') else str(value)
-                    }
-
+        # Convert the analysis result to a dictionary
         analysis_data = {
             "metadata": {
                 "timestamp": timestamp,
                 "contract_name": contract_name or "unnamed_contract",
-                "overall_score": structured.overall_score
+                "overall_score": analysis_result.structured_analysis.overall_score
             },
-            "detailed_analysis": detailed_fields,
-            "narrative_summary": {
+            "structured_analysis": {},
+            "summary": {
                 "executive_summary": analysis_result.summary.executive_summary,
-                "key_points": analysis_result.summary.key_points,
-                "potential_issues": analysis_result.summary.potential_issues,
-                "recommendations": analysis_result.summary.recommendations
+                "key_points": [kp.strip() for kp in analysis_result.summary.key_points.split("\n") if kp.strip()],
+                "potential_issues": [pi.strip() for pi in analysis_result.summary.potential_issues.split("\n") if pi.strip()],
+                "recommendations": [r.strip() for r in analysis_result.summary.recommendations.split("\n") if r.strip()]
             }
         }
 
+        # Process each field in the structured analysis
+        for field_name in [
+            'sick_leave', 'vacation', 'overtime', 'termination', 'confidentiality',
+            'non_compete', 'intellectual_property', 'governing_law', 'jurisdiction',
+            'dispute_resolution', 'liability', 'salary', 'benefits', 'work_hours',
+            'performance_evaluation', 'duties', 'responsibilities'
+        ]:
+            field = getattr(analysis_result.structured_analysis, field_name)
+            if field:
+                analysis_data["structured_analysis"][field_name] = {
+                    "content": field.content,
+                    "score": field.score
+                }
+            else:
+                analysis_data["structured_analysis"][field_name] = {
+                    "content": "",
+                    "score": None
+                }
+
+        # Ensure the output directory exists
+        if not os.path.exists(self.output_dir):
+            os.makedirs(self.output_dir)
+
+        # Save to JSON file
         filepath = os.path.join(self.output_dir, filename)
-        with open(filepath, 'w', encoding='utf-8') as f:
-            json.dump(analysis_data, f, ensure_ascii=False, indent=2)
-        
-        print(f"Analysis saved to: {filepath}")
-        return filepath
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(analysis_data, f, ensure_ascii=False, indent=2)
+            print(f"Analysis saved to: {filepath}")
+            return filepath
+        except Exception as e:
+            print(f"Error saving analysis to JSON: {e}")
+            raise
 
     def _extract_score(self, text: str) -> Optional[int]:
         """Extract score from text if present (format: "... (Punteggio: X)")"""
@@ -295,7 +363,7 @@ class ContractAnalyzerAgent:
         print("-"*30)
         structured = analysis_result.structured_analysis
         
-        for field_name, field in structured.model_fields.items():
+        for field_name, field in structured.__class__.model_fields.items():
             value = getattr(structured, field_name)
             if value is not None:
                 field_display = field_name.replace('_', ' ').title()
@@ -303,8 +371,10 @@ class ContractAnalyzerAgent:
                 if field_name == 'overall_score':
                     print(f"\n{field_display}: {value}/10")
                 else:
-                    print(f"\n{field_display} (Score: {value.score}/10):")
-                    print(f"{value.content}")
+                    print(f"\n{field_display}:")
+                    print(f"Score: {value.score if value.score else 'N/A'}/10")
+                    print(f"Analysis: {value.content}")
+                    print("-" * 30)
 
         # Print Narrative Summary
         print("\n" + "="*50)
