@@ -38,8 +38,6 @@ class ShadowAgent:
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
                 "Authorization": f"Bearer {self.api_key}",
-                "HTTP-Referer": "<YOUR_SITE_URL>",  # Optional. Replace with your site URL if needed.
-                "X-Title": "<YOUR_SITE_NAME>",      # Optional. Replace with your site name if needed.
             },
             data=json.dumps({
                 "model": "google/gemini-2.0-flash-001",  # Optional
