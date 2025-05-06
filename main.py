@@ -2,24 +2,35 @@ from shadowAgent import ShadowAgent
 from pdfExtractor import PdfTextExtractor
 from summaryAgent import ContractAnalyzerAgent
 
-# Example usage in the main script
 if __name__ == "__main__":
+    # Initialize agents
     ShadAgent = ShadowAgent()
     SummAgent = ContractAnalyzerAgent()
 
-    # Analyze a custom contract
-    custom_contract = """
-    This is a custom contract. The second party agrees to pay $500 upfront. The first party will deliver services
-    within 30 days. The contract is governed by the laws of New York.
-    """
+    # Set up PDF extractor
     extractor = PdfTextExtractor()
-    pdf_file = "esempio_contratto.pdf"  # Sostituisci con il percorso del tuo PDF
-    language = 'ita'  # Imposta la lingua per l'OCR (ISO 639-1 code)
+    pdf_file = "esempio_contratto.pdf"
+    language = 'ita'
 
-    contract = extractor.extract_text_from_pdf(pdf_file, lang=language)
-    print(ShadAgent.analyze(contract))
-    print(SummAgent.analyze(contract))
-
-    # Analyze using the placeholder contract
-    #print("\nPlaceholder Contract Analysis:")
-    #print(agent.analyze())
+    try:
+        # Extract text from PDF
+        contract = extractor.extract_text_from_pdf(pdf_file, lang=language)
+        
+        print("\n" + "="*80)
+        print("SHADOW ANALYSIS (Potential Issues and Risks):")
+        print("="*80)
+        shadow_analysis = ShadAgent.analyze(contract)
+        print(shadow_analysis)
+        
+        print("\n" + "="*80)
+        print("DETAILED CONTRACT ANALYSIS:")
+        print("="*80)
+        summary_analysis = SummAgent.analyze(contract)
+        SummAgent.print_analysis(summary_analysis)
+        
+        # Save the summary analysis to JSON
+        json_path = SummAgent.save_analysis(summary_analysis, "Contract Analysis")
+        print(f"\nFull analysis saved to: {json_path}")
+        
+    except Exception as e:
+        print(f"Error processing contract: {e}")

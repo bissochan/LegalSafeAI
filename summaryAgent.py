@@ -190,7 +190,7 @@ class ContractAnalyzerAgent:
             if "choices" in result and len(result["choices"]) > 0:
                 content = result["choices"][0]["message"]["content"]
                 # Add debug print to see raw API response
-                print("Raw API response:", content)
+                #print("Raw API response:", content)
                 analysis_result = self._parse_response(content)
                 return analysis_result
             else:
