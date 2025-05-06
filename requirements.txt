@@ -1,0 +1,8 @@
+pydantic
+python-dotenv
+pymupdf
+numpy
+pillow
+pytesseract
+requests
+pydantic-ai
