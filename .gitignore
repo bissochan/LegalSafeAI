@@ -177,3 +177,4 @@ pyrightconfig.json
 
 contract_analyses/
 contract_analysis_complete/
+flask_session/
