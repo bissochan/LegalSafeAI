@@ -74,6 +74,10 @@ def index():
 @app.route('/analyze', methods=['POST'])
 def analyze_contract():
     try:
+        # Get language preference
+        language = request.form.get('language', 'en')
+        print(f"Language selected: {language}")
+
         # Generate unique session ID
         session.clear()
         session['id'] = secrets.token_hex(16)
@@ -95,21 +99,22 @@ def analyze_contract():
 
         try:
             # Step 1: Extract text
-            logger.info("Extracting text from PDF...")
-            contract_text = pdf_extractor.extract_text_from_pdf(filepath, lang='eng')
+            logger.info(f"Extracting text from PDF (language: {language})...")
+            contract_text = pdf_extractor.extract_text_from_pdf(filepath, lang=language)
             
-            # Store session data
+            # Store session data with language
             session['contract_text'] = contract_text
+            session['language'] = language
             session['creation_time'] = time.time()
 
-            # Step 2: Shadow analysis
+            # Step 2: Shadow analysis with language
             logger.info("Performing shadow analysis...")
-            shadow_analysis = shadow_agent.analyze(contract_text)
+            shadow_analysis = shadow_agent.analyze(contract_text, language=language)
             session['shadow_analysis'] = str(shadow_analysis)
             
-            # Step 3: Contract analysis
+            # Step 3: Contract analysis with language
             logger.info("Analyzing contract structure...")
-            summary_analysis = summary_agent.analyze(contract_text)
+            summary_analysis = summary_agent.analyze(contract_text, language=language)
             session['summary_analysis'] = summary_analysis.model_dump()
 
             # Step 4: Evaluation
@@ -187,14 +192,17 @@ def chat():
             return jsonify({'error': 'Session expired'}), 401
 
         user_message = request.json.get('message')
+        language = request.json.get('language', 'en')
+        
         if not user_message:
             return jsonify({'error': 'No message provided'}), 400
 
-        # Initialize chat agent with stored context
+        # Initialize chat agent with stored context and language
         chat_agent.initialize_context(
             session.get('contract_text'),
             session.get('shadow_analysis'),
-            session.get('summary_analysis')
+            session.get('summary_analysis'),
+            language=language
         )
 
         # Get response
