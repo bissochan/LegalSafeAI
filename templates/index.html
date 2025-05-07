@@ -1,105 +1,992 @@
 <!DOCTYPE html>
 <html>
-<head>
+  <head>
     <title>LegalSafeAI - Contract Analysis</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link
+      href="https://cdn.jsdelivr.net/npm/@mdi/font@6.5.95/css/materialdesignicons.min.css"
+      rel="stylesheet"
+    />
     <style>
-        pre { white-space: pre-wrap; }
-        .analysis-section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
-        .score-badge { font-size: 1.2em; padding: 5px 10px; }
+      :root {
+        --primary-color: #2563eb;
+        --secondary-color: #1e40af;
+        --background-color: #f8fafc;
+        --card-background: #ffffff;
+        --text-primary: #1e293b;
+        --text-secondary: #64748b;
+        --border-color: #e2e8f0;
+        --success-color: #10b981;
+        --warning-color: #f59e0b;
+        --error-color: #ef4444;
+      }
+
+      body {
+        font-family: "Inter", sans-serif;
+        margin: 0;
+        padding: 0;
+        background-color: var(--background-color);
+        color: var(--text-primary);
+      }
+
+      .container {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 2rem;
+      }
+
+      .header {
+        margin-bottom: 2rem;
+        padding: 1rem 0;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .header h1 {
+        font-size: 1.875rem;
+        font-weight: 600;
+        color: var(--text-primary);
+        margin: 0;
+      }
+
+      .card {
+        background: var(--card-background);
+        border-radius: 0.75rem;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        padding: 1.5rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .upload-section {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+      }
+
+      .file-input {
+        flex: 1;
+        padding: 0.75rem;
+        border: 1px dashed var(--border-color);
+        border-radius: 0.5rem;
+        background: var(--background-color);
+      }
+
+      .btn {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 0.75rem 1.5rem;
+        border: none;
+        border-radius: 0.5rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .btn:hover {
+        background-color: var(--secondary-color);
+      }
+
+      .progress-section {
+        margin: 2rem 0;
+        position: relative;
+        padding: 1rem 0;
+      }
+
+      .progress-step {
+        position: absolute;
+        right: 0;
+        top: -0.5rem;
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+      }
+
+      .progress-message {
+        display: block;
+        margin-top: 0.75rem;
+        color: var(--text-primary);
+        font-weight: 500;
+      }
+
+      .progress-bar {
+        margin: 0.5rem 0;
+        height: 0.5rem;
+        background-color: var(--border-color);
+        border-radius: 0.25rem;
+        overflow: hidden;
+      }
+
+      .progress-fill {
+        height: 100%;
+        background-color: var(--primary-color);
+        transition: width 0.3s ease;
+      }
+
+      .analysis-section {
+        margin-bottom: 2rem;
+        padding: 1.5rem;
+        background: var(--card-background);
+        border-radius: 0.5rem;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      }
+
+      .analysis-section h3 {
+        color: var(--primary-color);
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+        font-weight: 600;
+      }
+
+      .analysis-section ul {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .analysis-section li {
+        padding: 0.75rem 0;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .analysis-section li:last-child {
+        border-bottom: none;
+      }
+
+      .analysis-text {
+        line-height: 1.6;
+        color: var(--text-primary);
+      }
+
+      .analysis-text strong {
+        color: var(--primary-color);
+        font-weight: 600;
+      }
+
+      .analysis-text br {
+        margin-bottom: 0.5rem;
+      }
+
+      .analysis-text • {
+        display: block;
+        padding-left: 1rem;
+        margin: 0.5rem 0;
+      }
+
+      .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+
+      .score-badge {
+        background-color: var(--primary-color);
+        color: white;
+        padding: 0.25rem 0.75rem;
+        border-radius: 1rem;
+        font-size: 0.875rem;
+        font-weight: 500;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+
+      .score-value {
+        font-size: 1.125rem;
+        font-weight: 600;
+      }
+
+      .score-label {
+        font-size: 0.75rem;
+        opacity: 0.8;
+        margin-left: 0.5rem;
+      }
+
+      .analysis-content {
+        margin-top: 1rem;
+      }
+
+      .score-details {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-out;
+        padding: 0 1rem;
+        background: white;
+      }
+
+      .score-details p {
+        margin: 1rem 0;
+      }
+
+      .model-score {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.5rem;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+      }
+
+      .model-score:last-child {
+        border-bottom: none;
+      }
+
+      .model-explanation {
+        display: none;
+        padding: 1rem;
+        margin-top: 0.5rem;
+        background-color: var(--card-background);
+        border-radius: 0.5rem;
+      }
+
+      .chat-section {
+        margin-top: 2rem;
+        height: 400px;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .chat-messages {
+        flex: 1;
+        overflow-y: auto;
+        padding: 1rem;
+        background-color: var(--background-color);
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .chat-input-container {
+        display: flex;
+        gap: 1rem;
+      }
+
+      .chat-input {
+        flex: 1;
+        padding: 0.75rem;
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        font-size: 1rem;
+      }
+
+      .message {
+        margin-bottom: 1rem;
+        max-width: 80%;
+      }
+
+      .user-message {
+        margin-left: auto;
+        background-color: var(--primary-color);
+        color: white;
+        padding: 0.75rem;
+        border-radius: 0.75rem 0.75rem 0 0.75rem;
+      }
+
+      .bot-message {
+        background-color: var(--card-background);
+        padding: 0.75rem;
+        border-radius: 0.75rem 0.75rem 0.75rem 0;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+      }
+
+      .structured-data {
+        margin-top: 1rem;
+      }
+
+      .structured-data h3 {
+        color: var(--text-primary);
+        font-size: 1.25rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .data-list {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .data-list li {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .data-list li:last-child {
+        border-bottom: none;
+      }
+
+      .error-message {
+        background-color: #fee2e2;
+        border: 1px solid #ef4444;
+        color: #991b1b;
+        padding: 1rem;
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+        display: none;
+      }
+
+      .analysis-item {
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .analysis-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1rem;
+        cursor: pointer;
+        background-color: var(--background-color);
+        border-radius: 0.5rem 0.5rem 0 0;
+      }
+
+      .analysis-header:hover {
+        background-color: #f1f5f9;
+      }
+
+      .analysis-title {
+        font-weight: 600;
+        color: var(--primary-color);
+      }
+
+      .analysis-details {
+        display: none;
+        padding: 1rem;
+        border-top: 1px solid var(--border-color);
+      }
+
+      .details-section {
+        margin-bottom: 1rem;
+      }
+
+      .details-section h4 {
+        color: var(--text-secondary);
+        margin-bottom: 0.5rem;
+      }
+
+      .structured-scores {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
+      }
+
+      .score-item {
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        overflow: hidden;
+      }
+
+      .score-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background-color: var(--background-color);
+        cursor: pointer;
+        transition: background-color 0.2s;
+      }
+
+      .score-header:hover {
+        background-color: #eef2ff;
+      }
+
+      .score-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .score-details {
+        display: none;
+        padding: 0.75rem;
+        border-top: 1px solid var(--border-color);
+      }
+
+      /* Shadow Analysis Styles */
+      .shadow-section {
+        padding: 1.5rem;
+      }
+
+      .shadow-text {
+        line-height: 1.6;
+        margin-bottom: 2rem;
+      }
+
+      .shadow-text p {
+        margin-bottom: 1rem;
+      }
+
+      .shadow-text strong {
+        color: var(--primary-color);
+        font-weight: 600;
+      }
+
+      .model-evaluations {
+        background: var(--background-color);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        margin-top: 1.5rem;
+      }
+
+      .model-evaluations h4 {
+        margin-bottom: 1rem;
+        color: var(--text-primary);
+      }
+
+      .model-scores {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+
+      .model-score {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.75rem;
+        background: var(--card-background);
+        border-radius: 0.5rem;
+        border: 1px solid var(--border-color);
+      }
+
+      .model-name {
+        font-weight: 500;
+        color: var(--text-primary);
+      }
+
+      /* Score Cards Styles */
+      .score-card {
+        background: var(--card-background);
+        border-radius: 0.5rem;
+        overflow: hidden;
+        border: 1px solid var(--border-color);
+        margin-bottom: 1rem;
+      }
+
+      .score-header {
+        padding: 1rem;
+        background: var(--background-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .score-content {
+        padding: 1rem;
+        color: var(--text-secondary);
+        font-size: 0.95rem;
+        line-height: 1.5;
+      }
+
+      .score-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .low-score {
+        border-left: 4px solid var(--error-color);
+      }
+
+      .high-score {
+        border-left: 4px solid var(--success-color);
+      }
+
+      /* Structured Analysis Styles */
+      .scores-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+        gap: 1rem;
+        margin-bottom: 2rem;
+      }
+
+      .score-card {
+        background: var(--card-background);
+        border-radius: 0.5rem;
+        padding: 1rem;
+        border: 1px solid var(--border-color);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .score-card.low-score {
+        border-left: 4px solid var(--error-color);
+      }
+
+      .score-card.high-score {
+        border-left: 4px solid var(--success-color);
+      }
+
+      .score-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+        padding: 1rem;
+        background: var(--background-color);
+        transition: background-color 0.2s;
+      }
+
+      .score-header:hover {
+        background-color: #eef2ff;
+      }
+
+      .score-info {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .score-details {
+        max-height: 0;
+        overflow: hidden;
+        transition: max-height 0.3s ease-out;
+        background: white;
+        padding: 0 1rem;
+      }
+
+      .score-details p {
+        margin: 1rem 0;
+      }
+
+      .score-content {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        margin-top: 0.5rem;
+      }
+
+      .summary-details {
+        margin-top: 1.5rem;
+      }
+
+      .summary-details h4 {
+        color: var(--primary-color);
+        margin: 1rem 0 0.5rem 0;
+      }
+
+      .data-list {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+      }
+
+      .data-list li {
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--border-color);
+      }
+
+      .data-list li:last-child {
+        border-bottom: none;
+      }
+
+      /* Chat Styles */
+      .chat-message {
+        max-width: 80%;
+        margin: 0.5rem;
+        padding: 1rem;
+        border-radius: 1rem;
+        line-height: 1.5;
+        font-size: 0.95rem;
+      }
+
+      .chat-message p {
+        margin: 0 0 0.75rem 0;
+      }
+
+      .chat-message p:last-child {
+        margin-bottom: 0;
+      }
+
+      .user-message {
+        margin-left: auto;
+        background-color: var(--primary-color);
+        color: white;
+        border-radius: 1rem 1rem 0 1rem;
+      }
+
+      .bot-message {
+        margin-right: auto;
+        background-color: var(--background-color);
+        border: 1px solid var(--border-color);
+        border-radius: 1rem 1rem 1rem 0;
+      }
+
+      .chat-message ul {
+        margin: 0.5rem 0;
+        padding-left: 1.5rem;
+      }
+
+      .chat-message li {
+        margin: 0.25rem 0;
+      }
     </style>
-</head>
-<body>
-    <div class="container mt-5">
-        <h1 class="mb-4">LegalSafeAI Contract Analyzer</h1>
-        
-        <div class="card mb-4">
-            <div class="card-body">
-                <form id="uploadForm">
-                    <div class="mb-3">
-                        <label for="contractFile" class="form-label">Upload Contract (PDF)</label>
-                        <input type="file" class="form-control" id="contractFile" accept=".pdf" required>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Analyze Contract</button>
-                </form>
-            </div>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>LegalSafeAI Contract Analyzer</h1>
+      </div>
+
+      <div id="errorMessage" class="error-message"></div>
+
+      <div class="card">
+        <form id="uploadForm" class="upload-section">
+          <input
+            type="file"
+            class="file-input"
+            id="contractFile"
+            accept=".pdf"
+            required
+          />
+          <button type="submit" class="btn">Analyze Contract</button>
+        </form>
+
+        <div class="progress-section" style="display: none">
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: 0%"></div>
+          </div>
+          <p id="statusMessage" class="status-text"></p>
+        </div>
+      </div>
+
+      <div id="results" style="display: none">
+        <!-- Contract Analysis Summary -->
+        <div class="card analysis-section">
+          <div class="section-header">
+            <h2>Contract Analysis</h2>
+            <div class="score-badge" id="summaryScore"></div>
+          </div>
+          <div id="summaryContent" class="analysis-content"></div>
         </div>
 
-        <div id="results" style="display: none;">
-            <div class="analysis-section shadow-section">
-                <h2>Shadow Analysis</h2>
-                <div class="alert alert-info">
-                    <strong>Accuracy Score: </strong>
-                    <span id="shadowScore" class="badge bg-primary score-badge"></span>
-                </div>
-                <pre id="shadowAnalysis"></pre>
-            </div>
-
-            <div class="analysis-section summary-section">
-                <h2>Contract Summary</h2>
-                <div class="alert alert-info">
-                    <strong>Accuracy Score: </strong>
-                    <span id="summaryScore" class="badge bg-primary score-badge"></span>
-                </div>
-                <div id="summaryAnalysis"></div>
-            </div>
+        <!-- Scores Section -->
+        <div class="card scores-section">
+          <h3>Contract Section Scores</h3>
+          <div id="scoresGrid" class="scores-grid"></div>
         </div>
+
+        <!-- Shadow Analysis -->
+        <div class="card analysis-section">
+          <div class="section-header">
+            <h2>Shadow Analysis</h2>
+            <div class="score-badge" id="shadowScore"></div>
+          </div>
+          <div id="shadowContent" class="analysis-content"></div>
+        </div>
+
+        <!-- Chat Section -->
+        <div class="card chat-section">
+          <h3>Ask Questions About the Contract</h3>
+          <div id="chatMessages" class="chat-messages"></div>
+          <div class="chat-input-container">
+            <input
+              type="text"
+              id="chatInput"
+              class="chat-input"
+              placeholder="Ask a question about the contract..."
+            />
+            <button class="btn" onclick="sendMessage()">Send</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <script>
-        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const formData = new FormData();
-            formData.append('file', document.getElementById('contractFile').files[0]);
+      function updateProgress(step, total, message) {
+        const progressSection = document.querySelector(".progress-section");
+        const progressFill = document.querySelector(".progress-fill");
+        const statusMessage = document.getElementById("statusMessage");
 
-            try {
-                const response = await fetch('/analyze', {
-                    method: 'POST',
-                    body: formData
-                });
+        progressSection.style.display = "block";
+        const percentage = (step / total) * 100;
 
-                const result = await response.json();
-                
-                if (result.error) {
-                    alert(result.error);
-                    return;
-                }
+        // Animate the progress bar
+        progressFill.style.transition = "width 0.3s ease";
+        progressFill.style.width = `${percentage}%`;
 
-                // Display results
-                document.getElementById('results').style.display = 'block';
-                
-                // Update Shadow Analysis
-                document.getElementById('shadowScore').textContent = 
-                    `${result.data.summary.evaluation_scores.set1.average}%`;
-                document.getElementById('shadowAnalysis').textContent = 
-                    result.data.summary.agent_response;
+        // Update status message with progress
+        statusMessage.innerHTML = `
+                <span class="progress-step">${step}/${total}</span>
+                <span class="progress-message">${message}</span>
+            `;
+      }
 
-                // Update Summary Analysis
-                document.getElementById('summaryScore').textContent = 
-                    `${result.data.summary.evaluation_scores.set2.average}%`;
-                
-                const summaryDiv = document.getElementById('summaryAnalysis');
-                summaryDiv.innerHTML = `
+      function displayResults(data) {
+        document.getElementById("results").style.display = "block";
+
+        // Contract Analysis Summary
+        displayContractSummary(data.summary);
+
+        // Scores Grid
+        displayScoresGrid(data.structured_analysis);
+
+        // Shadow Analysis
+        displayShadowAnalysis(data.evaluation.shadow_analysis);
+
+        // Update score badges
+        updateScoreBadges(data.evaluation);
+      }
+
+      function displayContractSummary(summary) {
+        document.getElementById("summaryContent").innerHTML = `
+                <div class="summary-section">
                     <h3>Executive Summary</h3>
-                    <p>${result.data.summary.executive_summary}</p>
+                    <p>${summary.executive_summary}</p>
                     
-                    <h3>Key Points</h3>
-                    <ul>${result.data.summary.key_points.map(point => 
-                        `<li>${point}</li>`).join('')}</ul>
-                    
-                    <h3>Potential Issues</h3>
-                    <ul>${result.data.summary.potential_issues.map(issue => 
-                        `<li>${issue}</li>`).join('')}</ul>
-                    
-                    <h3>Recommendations</h3>
-                    <ul>${result.data.summary.recommendations.map(rec => 
-                        `<li>${rec}</li>`).join('')}</ul>
-                `;
-            } catch (error) {
-                alert('Error analyzing contract: ' + error);
+                    <div class="summary-details">
+                        <h4>Key Points</h4>
+                        <ul class="data-list">${summary.key_points
+                          .map((point) => `<li>${point}</li>`)
+                          .join("")}</ul>
+                        
+                        <h4>Potential Issues</h4>
+                        <ul class="data-list">${summary.potential_issues
+                          .map((issue) => `<li>${issue}</li>`)
+                          .join("")}</ul>
+                        
+                        <h4>Recommendations</h4>
+                        <ul class="data-list">${summary.recommendations
+                          .map((rec) => `<li>${rec}</li>`)
+                          .join("")}</ul>
+                    </div>
+                </div>
+            `;
+      }
+
+      function displayScoresGrid(analysis) {
+        const scoresHtml = Object.entries(analysis)
+          .map(
+            ([key, value]) => `
+                    <div class="score-card ${getScoreClass(value.score)}">
+                        <div class="score-header">
+                            <h4>${formatTitle(key)}</h4>
+                            <div class="score-info">
+                                <span class="score-badge">${value.score}/10</span>
+                            </div>
+                        </div>
+                        ${value.content ? `
+                            <div class="score-content">
+                                <p>${value.content}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                `
+          )
+          .join("");
+
+        document.getElementById("scoresGrid").innerHTML = scoresHtml;
+      }
+
+      function displayShadowAnalysis(shadowData) {
+        const shadowContent = document.getElementById('shadowContent');
+        
+        // Display the shadow analysis content
+        shadowContent.innerHTML = `
+            <div class="shadow-section">
+                <div class="shadow-text">
+                    ${formatShadowContent(shadowData.content)}
+                </div>
+                <div class="model-evaluations">
+                    <h4>Model Evaluations</h4>
+                    <div class="model-scores">
+                        ${Object.entries(shadowData.evaluation.scores)
+                            .map(([model, score]) => `
+                                <div class="model-score">
+                                    <span class="model-name">${model.split('/')[1]}</span>
+                                    <span class="score-badge">${score}%</span>
+                                </div>
+                            `).join('')}
+                    </div>
+                </div>
+            </div>
+        `;
+      }
+
+      function formatShadowContent(content) {
+        // Remove markdown formatting and apply HTML formatting
+        return content
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/\n/g, '<br>')
+            .replace(/•/g, '&#8226;')
+            .trim();
+      }
+
+      function updateScoreBadges(evaluation) {
+        // Update Shadow Analysis score badge
+        document.getElementById('shadowScore').innerHTML = `
+            <div class="score-value">${Math.round(evaluation.shadow_analysis.evaluation.average)}%</div>
+            <div class="score-label">Analysis Accuracy</div>
+        `;
+
+        // Update Summary score badge
+        document.getElementById('summaryScore').innerHTML = `
+            <div class="score-value">${Math.round(evaluation.summary_evaluation.average)}%</div>
+            <div class="score-label">Overall Score</div>
+        `;
+      }
+
+      function getScoreClass(score) {
+        if (score <= 3) return "low-score";
+        if (score >= 8) return "high-score";
+        return "";
+      }
+
+      function formatTitle(key) {
+        return key.replace(/_/g, " ").toUpperCase();
+      }
+
+      function toggleScoreDetails(element) {
+        const details = element.parentElement.querySelector(".score-details");
+        const icon = element.querySelector(".mdi");
+
+        if (details.style.maxHeight) {
+          details.style.maxHeight = null;
+          icon.classList.replace("mdi-chevron-up", "mdi-chevron-down");
+        } else {
+          details.style.maxHeight = details.scrollHeight + "px";
+          icon.classList.replace("mdi-chevron-down", "mdi-chevron-up");
+        }
+      }
+
+      function displayChatMessage(message, isUser = false) {
+        const chatMessages = document.getElementById("chatMessages");
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `chat-message ${
+          isUser ? "user-message" : "bot-message"
+        }`;
+
+        // Format message into paragraphs
+        const formattedMessage = message
+          .split("\n\n")
+          .map((para) => `<p>${para.trim()}</p>`)
+          .join("");
+
+        messageDiv.innerHTML = formattedMessage;
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      document
+        .getElementById("uploadForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          // Clear previous error and results
+          document.getElementById("errorMessage").style.display = "none";
+          document.getElementById("results").style.display = "none";
+
+          const formData = new FormData();
+          const fileInput = document.getElementById("contractFile");
+
+          if (!fileInput.files.length) {
+            showError("Please select a PDF file");
+            return;
+          }
+
+          formData.append("file", fileInput.files[0]);
+
+          // Show progress section
+          const progressSection = document.querySelector(".progress-section");
+          progressSection.style.display = "block";
+          updateProgress(0, 5, "Starting analysis...");
+
+          try {
+            const response = await fetch("/analyze", {
+              method: "POST",
+              body: formData,
+            });
+
+            const result = await response.json();
+
+            if (result.status === "error") {
+              showError(result.message, result.details);
+              progressSection.style.display = "none";
+              return;
             }
+
+            if (result.status === "progress") {
+              updateProgress(result.step, result.total_steps, result.message);
+              return;
+            }
+
+            if (result.status === "success") {
+              // Hide progress
+              progressSection.style.display = "none";
+
+              // Display results
+              displayResults(result.data);
+            }
+          } catch (error) {
+            showError("Error processing contract", error.message);
+            progressSection.style.display = "none";
+          }
         });
+
+      function initializeChat() {
+        const chatInput = document.getElementById("chatInput");
+        const chatMessages = document.getElementById("chatMessages");
+
+        chatInput.addEventListener("keypress", function (e) {
+          if (e.key === "Enter") {
+            sendMessage();
+          }
+        });
+      }
+
+      async function sendMessage() {
+        const chatInput = document.getElementById("chatInput");
+        const chatMessages = document.getElementById("chatMessages");
+        const message = chatInput.value.trim();
+
+        if (!message) return;
+
+        // Add user message
+        chatMessages.innerHTML += `
+                <div class="message user-message">
+                    <p>${message}</p>
+                </div>
+            `;
+
+        chatInput.value = "";
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        try {
+          const response = await fetch("/chat", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ message }),
+          });
+
+          const result = await response.json();
+
+          if (result.status === "error") {
+            throw new Error(result.message);
+          }
+
+          // Add bot response
+          chatMessages.innerHTML += `
+                    <div class="message bot-message">
+                        <p>${result.response}</p>
+                    </div>
+                `;
+        } catch (error) {
+          chatMessages.innerHTML += `
+                    <div class="message bot-message error">
+                        <p>Error: ${error.message}</p>
+                    </div>
+                `;
+        }
+
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      // Initialize chat when page loads
+      document.addEventListener("DOMContentLoaded", initializeChat);
     </script>
-</body>
+  </body>
 </html>

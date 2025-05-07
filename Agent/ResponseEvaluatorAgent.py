@@ -17,7 +17,7 @@ class ResponseEvaluator:
         if not self.api_key:
             raise ValueError("API key not found in .env file.")
         
-        # Modelli per la valutazione (sostituisci con i tuoi)
+        # Modelli per la valutazione
         self.models = [
             "google/gemini-2.0-flash-001",
             "openai/gpt-4o",
@@ -26,154 +26,138 @@ class ResponseEvaluator:
         
         # Threshold per considerare la risposta corretta
         self.accuracy_threshold = 80
+        # Timeout per le richieste API
+        self.timeout = 30
 
-    def evaluate(self, contract, response_to_evaluate, response_type):
-        """
-        Evaluate the correctness of a provided response against a contract using three models.
+    def clean_json_response(self, response_text: str) -> str:
+        """Tenta di estrarre un JSON valido da una risposta potenzialmente malformata."""
+        if not response_text or response_text.isspace():
+            logger.warning("Response text is empty or contains only whitespace")
+            return "{}"  # Restituisci un JSON vuoto come fallback
 
-        Args:
-            contract (str): The contract text for context.
-            response_to_evaluate (str): The response to evaluate for correctness.
-            response_type (str): Type of response, either "shadow" or "summary".
+        # Rimuove eventuali blocchi di codice markdown (es. ```json ... ```)
+        response_text = re.sub(r'^```json\n|\n```$', '', response_text, flags=re.MULTILINE)
+        
+        # Rimuove spazi o caratteri non validi iniziali/finali
+        response_text = response_text.strip()
+        
+        # Sostituisce caratteri di controllo non validi (es. \n, \t) all'interno delle stringhe
+        def escape_control_chars(match):
+            text = match.group(0)
+            return text.replace('\n', '\\n').replace('\t', '\\t').replace('\r', '\\r')
+        
+        # Applica la sostituzione solo alle stringhe tra virgolette
+        response_text = re.sub(r'"[^"]*"', escape_control_chars, response_text)
+        
+        # Cerca un oggetto JSON valido
+        json_pattern = r'\{.*\}'
+        match = re.search(json_pattern, response_text, re.DOTALL)
+        if match:
+            return match.group(0)
+        
+        # Se non trova un JSON, restituisci un JSON vuoto
+        logger.warning(f"Could not extract valid JSON from response: {response_text}")
+        return "{}"
 
-        Returns:
-            dict: Contains individual scores, average score, and verdict.
-        """
-        # Validazione input
-        if not isinstance(contract, str) or not contract.strip():
-            logger.error("No valid contract provided")
-            return {"error": "A valid contract is required."}
-        if not isinstance(response_to_evaluate, str) or not response_to_evaluate.strip():
-            logger.error("No valid response provided for evaluation")
-            return {"error": "A valid response to evaluate is required."}
-        if response_type not in ["shadow", "summary"]:
-            logger.error("Invalid response_type. Must be 'shadow' or 'summary'.")
-            return {"error": "response_type must be 'shadow' or 'summary'."}
-
-        # Prompt specifici per tipo di risposta
-        if response_type == "shadow":
-            system_prompt = """You are an expert legal evaluator tasked with assessing the correctness of a provided response 
-            regarding a contract analysis. The response is a general analysis of a contract, identifying ambiguities, risks, or 
-            unfavorable clauses. Your goal is to evaluate whether the response accurately identifies issues and provides appropriate 
-            suggestions.
-
-            Instructions:
-            - Compare the provided response with the contract.
-            - Assess the response for factual accuracy, completeness, and relevance in identifying key issues (e.g., unclear terms, 
-              liability, termination, payments, IP, jurisdiction).
-            - Provide a brief explanation of your evaluation.
-            - Assign an accuracy score between 0 and 100, where:
-              - 0: Completely incorrect or irrelevant.
-              - 100: Perfectly accurate and comprehensive.
-            - Return your response in the following JSON format:
-              {
-                "explanation": "Your explanation here",
-                "accuracy_score": <integer between 0 and 100>
-              }
-            """
-        else:  # summary
-            system_prompt = """You are an expert legal evaluator tasked with assessing the correctness of a provided response 
-            regarding a contract analysis. The response is a detailed summary of an employment contract, covering specific fields 
-            (e.g., sick leave, vacation, termination). Your goal is to evaluate whether the content of the summary and field analyses 
-            is factually accurate and relevant to the contract, ignoring the response's format or structure.
-
-            Instructions:
-            - Compare the provided response with the contract.
-            - Assess the response for factual accuracy, completeness, and relevance in describing the contract's terms and identifying 
-              issues in fields like sick leave, vacation, termination, etc.
-            - Provide a brief explanation of your evaluation, focusing on the content's correctness.
-            - Assign an accuracy score between 0 and 100, where:
-              - 0: Completely incorrect or irrelevant.
-              - 100: Perfectly accurate and comprehensive.
-            - Return your response in the following JSON format:
-              {
-                "explanation": "Your explanation here",
-                "accuracy_score": <integer between 0 and 100>
-              }
-            """
-
+    def evaluate(self, contract: str, response_to_evaluate: str, response_type: str) -> dict:
+        """Evaluate a response using multiple models."""
         results = {}
         scores = []
 
-        # Chiama ogni modello
+        # Define evaluation criteria
+        evaluation_prompt = {
+            "role": "system",
+            "content": f"""You are a legal contract evaluator. Analyze the {'shadow analysis' if response_type == 'shadow' else 'contract summary'} for accuracy and completeness.
+            YOU MUST RESPOND WITH A VALID JSON OBJECT IN THIS EXACT FORMAT:
+            {{
+                "explanation": "<your detailed evaluation explanation>",
+                "accuracy_score": <integer between 0 and 100>
+            }}
+            DO NOT include any text outside the JSON. Ensure the response is valid JSON."""
+        }
+
+        user_prompt = {
+            "role": "user",
+            "content": f"""Contract: {contract}
+                        Response to evaluate: {response_to_evaluate}
+                        
+                        Evaluate this response and provide your assessment in the required JSON format."""
+        }
+
+        # Evaluate with each model
         for model in self.models:
             try:
-                logger.info(f"Evaluating response with model: {model}")
                 response = requests.post(
-                    url="https://openrouter.ai/api/v1/chat/completions",
+                    "https://openrouter.ai/api/v1/chat/completions",
                     headers={
                         "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json"
                     },
-                    data=json.dumps({
+                    json={
                         "model": model,
-                        "messages": [
-                            {"role": "system", "content": system_prompt},
-                            {
-                                "role": "user",
-                                "content": f"Contract: {contract}\n\nResponse to evaluate: {response_to_evaluate}"
-                            }
-                        ]
-                    }),
-                    timeout=10
+                        "messages": [evaluation_prompt, user_prompt]
+                    },
+                    timeout=self.timeout
                 )
                 response.raise_for_status()
 
-                # Estrai il contenuto della risposta
-                response_data = response.json()
-                if 'choices' not in response_data or not response_data['choices']:
-                    logger.warning(f"Empty response from model {model}")
-                    results[model] = {"error": "Empty or invalid response"}
-                    continue
+                # Log dello status e del contenuto grezzo
+                raw_content = response.content.decode('utf-8', errors='replace')
+                #logger.info(f"Response status for {model}: {response.status_code}")
+                #logger.info(f"Raw response content for {model}: {raw_content}")
 
-                model_response = response_data['choices'][0]['message']['content']
-                
-                # Prova a parsare il JSON dalla risposta
                 try:
-                    evaluation = json.loads(model_response)
-                    if "accuracy_score" in evaluation and "explanation" in evaluation:
-                        score = int(evaluation["accuracy_score"])
-                        if 0 <= score <= 100:
-                            scores.append(score)
-                            results[model] = evaluation
-                        else:
-                            results[model] = {"error": "Invalid accuracy score"}
-                    else:
-                        results[model] = {"error": "Missing required fields in response"}
-                except json.JSONDecodeError:
-                    # Fallback con regex per estrarre lo score
-                    score_match = re.search(r"accuracy_score\":\s*(\d+)", model_response)
-                    if score_match:
-                        score = int(score_match.group(1))
-                        if 0 <= score <= 100:
-                            scores.append(score)
-                            results[model] = {
-                                "explanation": "Extracted from non-JSON response",
-                                "accuracy_score": score
-                            }
-                        else:
-                            results[model] = {"error": "Invalid accuracy score"}
-                    else:
-                        results[model] = {"error": "Failed to parse response as JSON"}
+                    # Parsa la risposta JSON
+                    response_data = response.json()
+
+                    # Estrai la risposta del modello
+                    choices = response_data.get('choices', [])
+                    if not choices:
+                        raise ValueError("No choices in API response")
+                    
+                    model_response = choices[0].get('message', {}).get('content', '').strip()
+                    if not model_response:
+                        raise ValueError("Empty response from model")
+
+                    # Tenta di ripulire la risposta
+                    cleaned_response = self.clean_json_response(model_response)
+                    
+                    # Parse JSON
+                    evaluation = json.loads(cleaned_response)
+
+                    # Validate JSON structure
+                    if not isinstance(evaluation, dict):
+                        raise ValueError("Response is not a JSON object")
+                    if not all(key in evaluation for key in ["explanation", "accuracy_score"]):
+                        raise ValueError("Missing required fields in JSON")
+                    if not isinstance(evaluation["accuracy_score"], (int, float)):
+                        raise ValueError("accuracy_score must be a number")
+                    if not 0 <= evaluation["accuracy_score"] <= 100:
+                        raise ValueError("accuracy_score must be between 0 and 100")
+
+                    scores.append(evaluation["accuracy_score"])
+                    results[model] = evaluation
+                    logger.info(f"Successfully evaluated with {model}")
+
+                except (json.JSONDecodeError, ValueError) as e:
+                    logger.error(f"Invalid response from {model}: {str(e)}")
+                    logger.error(f"Raw model response: {model_response}")
+                    results[model] = {"error": f"Invalid response format: {str(e)}"}
 
             except requests.exceptions.RequestException as e:
-                logger.error(f"Network error with model {model}: {str(e)}")
-                results[model] = {"error": f"Network error: {str(e)}"}
-            except Exception as e:
-                logger.error(f"Unexpected error with model {model}: {str(e)}")
-                results[model] = {"error": f"Unexpected error: {str(e)}"}
+                logger.error(f"API error with {model}: {str(e)}")
+                logger.error(f"Response content: {response.content.decode('utf-8', errors='replace') if 'response' in locals() else 'No response'}")
+                results[model] = {"error": f"API error: {str(e)}"}
 
-        # Calcola la media degli score validi
-        average_score = sum(scores) / len(scores) if scores else 0
-        is_correct = average_score >= self.accuracy_threshold if scores else False
+        # Calculate average score from valid responses
+        valid_scores = [score for score in scores if isinstance(score, (int, float))]
+        average_score = sum(valid_scores) / len(valid_scores) if valid_scores else 0
+        is_correct = average_score >= self.accuracy_threshold
 
-        # Risultato finale
-        final_result = {
+        return {
             "response_type": response_type,
             "model_results": results,
             "average_score": round(average_score, 2),
             "is_correct": is_correct,
             "threshold": self.accuracy_threshold
         }
-
-        logger.info(f"Evaluation complete. Response type: {response_type}, Average score: {average_score}, Correct: {is_correct}")
-        return final_result

@@ -7,4 +7,6 @@ pytesseract
 requests
 pydantic-ai
 flask
+flask-session
 werkzeug
+apscheduler
