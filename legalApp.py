@@ -232,14 +232,19 @@ def cleanup_old_sessions():
     except Exception as e:
         logger.error(f"Session cleanup error: {e}")
 
+import os
+from apscheduler.schedulers.background import BackgroundScheduler
+
 if __name__ == '__main__':
     # Schedule session cleanup
-    from apscheduler.schedulers.background import BackgroundScheduler
     scheduler = BackgroundScheduler()
     scheduler.add_job(cleanup_old_sessions, 'interval', hours=1)
     scheduler.start()
-    
+
     try:
-        app.run(debug=True)
+        # Get port from environment variable or default to 5000 for local dev
+        port = int(os.environ.get('PORT', 5000))
+        # Run Flask app for local development, binding to 0.0.0.0
+        app.run(host='0.0.0.0', port=port, debug=True)
     except (KeyboardInterrupt, SystemExit):
         scheduler.shutdown()
