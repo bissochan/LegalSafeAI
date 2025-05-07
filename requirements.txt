@@ -6,3 +6,5 @@ pillow
 pytesseract
 requests
 pydantic-ai
+flask
+werkzeug

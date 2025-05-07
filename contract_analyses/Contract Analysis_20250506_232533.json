@@ -1,0 +1,101 @@
+{
+  "metadata": {
+    "timestamp": "20250506_232533",
+    "contract_name": "Contract Analysis",
+    "overall_score": 5
+  },
+  "structured_analysis": {
+    "sick_leave": {
+      "content": "The employee is entitled to 5 days of paid sick leave per year. Additional sick leave may be granted at the employer's discretion. The clause is simple and doesn't specify how sick leave accrues or whether unused days can be carried over or paid out.",
+      "score": 6
+    },
+    "vacation": {
+      "content": "The employee is entitled to 10 days of paid vacation per year. Vacation days must be approved in advance by the employer. Unused vacation days will not be carried over to the next year. The \"use it or lose it\" clause for vacation is standard.",
+      "score": 6
+    },
+    "overtime": {
+      "content": "Overtime may be required at the Employer's discretion. There is no explicit statement about how overtime will be compensated (e.g., time-and-a-half). Given the employee is classified as Software Engineer and paid an annual salary, it is highly probable the position will be classified as exempt, so overtime will not be paid. This should be explicitly stated.",
+      "score": 4
+    },
+    "termination": {
+      "content": "Either party may terminate the Contract with 30 days’ written notice. The Employer may terminate the Employee immediately for cause, including but not limited to misconduct or failure to perform duties. No severance pay is provided.",
+      "score": 6
+    },
+    "confidentiality": {
+      "content": "The employee agrees to maintain the confidentiality of all proprietary information and trade secrets of the employer during and after employment. This is a standard and broad confidentiality clause.",
+      "score": 7
+    },
+    "non_compete": {
+      "content": "For a period of one year after termination, the Employee shall not engage in any business that competes with the Employer’s core business within a 50-mile radius of the Employer’s principal office. This needs careful review under California law, which strongly disfavors non-competes unless very narrowly tailored and falling under specific exceptions related to the sale of a business or partnership dissolution, neither of which seems to exist here. It is likely unenforceable. The definition of \"core business\" is vague.",
+      "score": 3
+    },
+    "intellectual_property": {
+      "content": "The contract lacks any mention of intellectual property. It does not specify who owns the created intellectual property (software, documents, designs, etc.) created by the employee during his employment.",
+      "score": 1
+    },
+    "governing_law": {
+      "content": "The Contract shall be governed by and construed in accordance with the laws of the State of California. This is a standard clause.",
+      "score": 10
+    },
+    "jurisdiction": {
+      "content": "The contract does not specify a jurisdiction. Since the governing law is California and the employer's principal office is in San Francisco, the jurisdiction is most likely California, specifically San Francisco County, but it should be clearly stated.",
+      "score": 7
+    },
+    "dispute_resolution": {
+      "content": "Any disputes arising under this Contract shall be resolved through binding arbitration in San Francisco, California, in accordance with the rules of the American Arbitration Association.",
+      "score": 8
+    },
+    "liability": {
+      "content": "The Employer shall not be liable for any damages, losses, or injuries arising from the Employee’s performance of duties under this Contract. This clause is quite broad and could be problematic. It is unlikely to be fully enforceable as it may not protect the employer from gross negligence or willful misconduct.",
+      "score": 4
+    },
+    "salary": {
+      "content": "The employee shall receive an annual salary of USD 80,000, payable in bi-weekly installments. Deductions for taxes and other withholdings are required by law.",
+      "score": 8
+    },
+    "benefits": {
+      "content": "The contract is silent on the employee's benefits. This includes items such as health insurance, dental, vision, life, disability, 401k, etc. The employee should consult with the HR department to get a complete list.",
+      "score": 1
+    },
+    "work_hours": {
+      "content": "The Employee shall work a minimum of 40 hours per week, with schedules determined by the Employer. Overtime may be required at the Employer’s discretion.",
+      "score": 7
+    },
+    "performance_evaluation": {
+      "content": "The contract does not include any provision for performance evaluations or how frequently they will occur.",
+      "score": 1
+    },
+    "duties": {
+      "content": "The Employee shall perform duties as assigned by the Employer, including but not limited to software development, system maintenance, and project management. This is a standard clause.",
+      "score": 7
+    },
+    "responsibilities": {
+      "content": "Clause 1 contains employee's responsibilities.",
+      "score": 7
+    }
+  },
+  "summary": {
+    "executive_summary": "The employment contract for John Doe at Tech Innovations Inc. is a basic agreement, covering essential elements of employment. However, it lacks detail and clarity in several key areas, particularly benefits, intellectual property assignment, overtime compensation, and the enforceability of the non-compete clause under California law. The \"liability\" clause is overly broad and may not be fully enforceable. While the salary and termination provisions are standard, the contract overall leans towards the employer's favor due to the lack of detail in employee benefits and the limitations imposed without commensurate consideration.",
+    "key_points": [
+      "Standard employment terms for a Software Engineer",
+      "Lacks details on Benefits and IP ownership",
+      "Non-Compete might be unenforceable in California"
+    ],
+    "potential_issues": [
+      "Vague duties",
+      "Unclear overtime policy",
+      "Broad liability clause",
+      "Unenforceable Non-Compete",
+      "Missing Intellectual Property Clause",
+      "Missing benefits information"
+    ],
+    "recommendations": [
+      "Negotiate for a clear definition of benefits",
+      "Clarify the intellectual property rights assignment",
+      "Remove or significantly narrow the non-compete clause or seek independent legal advice on its enforceability",
+      "Seek clarity on overtime compensation and eligibility",
+      "Negotiate a more specific list of responsibilities",
+      "Add a section for performance evaluation."
+    ]
+  }
+}

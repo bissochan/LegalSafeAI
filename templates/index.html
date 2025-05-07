@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>LegalSafeAI - Contract Analysis</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        pre { white-space: pre-wrap; }
+        .analysis-section { margin: 20px 0; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .score-badge { font-size: 1.2em; padding: 5px 10px; }
+    </style>
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="mb-4">LegalSafeAI Contract Analyzer</h1>
+        
+        <div class="card mb-4">
+            <div class="card-body">
+                <form id="uploadForm">
+                    <div class="mb-3">
+                        <label for="contractFile" class="form-label">Upload Contract (PDF)</label>
+                        <input type="file" class="form-control" id="contractFile" accept=".pdf" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary">Analyze Contract</button>
+                </form>
+            </div>
+        </div>
+
+        <div id="results" style="display: none;">
+            <div class="analysis-section shadow-section">
+                <h2>Shadow Analysis</h2>
+                <div class="alert alert-info">
+                    <strong>Accuracy Score: </strong>
+                    <span id="shadowScore" class="badge bg-primary score-badge"></span>
+                </div>
+                <pre id="shadowAnalysis"></pre>
+            </div>
+
+            <div class="analysis-section summary-section">
+                <h2>Contract Summary</h2>
+                <div class="alert alert-info">
+                    <strong>Accuracy Score: </strong>
+                    <span id="summaryScore" class="badge bg-primary score-badge"></span>
+                </div>
+                <div id="summaryAnalysis"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('file', document.getElementById('contractFile').files[0]);
+
+            try {
+                const response = await fetch('/analyze', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+                
+                if (result.error) {
+                    alert(result.error);
+                    return;
+                }
+
+                // Display results
+                document.getElementById('results').style.display = 'block';
+                
+                // Update Shadow Analysis
+                document.getElementById('shadowScore').textContent = 
+                    `${result.data.summary.evaluation_scores.set1.average}%`;
+                document.getElementById('shadowAnalysis').textContent = 
+                    result.data.summary.agent_response;
+
+                // Update Summary Analysis
+                document.getElementById('summaryScore').textContent = 
+                    `${result.data.summary.evaluation_scores.set2.average}%`;
+                
+                const summaryDiv = document.getElementById('summaryAnalysis');
+                summaryDiv.innerHTML = `
+                    <h3>Executive Summary</h3>
+                    <p>${result.data.summary.executive_summary}</p>
+                    
+                    <h3>Key Points</h3>
+                    <ul>${result.data.summary.key_points.map(point => 
+                        `<li>${point}</li>`).join('')}</ul>
+                    
+                    <h3>Potential Issues</h3>
+                    <ul>${result.data.summary.potential_issues.map(issue => 
+                        `<li>${issue}</li>`).join('')}</ul>
+                    
+                    <h3>Recommendations</h3>
+                    <ul>${result.data.summary.recommendations.map(rec => 
+                        `<li>${rec}</li>`).join('')}</ul>
+                `;
+            } catch (error) {
+                alert('Error analyzing contract: ' + error);
+            }
+        });
+    </script>
+</body>
+</html>

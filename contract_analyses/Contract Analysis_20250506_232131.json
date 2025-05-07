@@ -1,0 +1,98 @@
+{
+  "metadata": {
+    "timestamp": "20250506_232131",
+    "contract_name": "Contract Analysis",
+    "overall_score": 5
+  },
+  "structured_analysis": {
+    "sick_leave": {
+      "content": "The employee is entitled to 5 days of paid sick leave per year. Additional sick leave may be granted at the employer's discretion. This provides a minimal amount of sick leave, leaving room for employer discretion.",
+      "score": 6
+    },
+    "vacation": {
+      "content": "The employee is entitled to 10 days of paid vacation per year. Vacation days must be approved in advance by the Employer. Unused vacation days will not be carried over to the next year. This is a relatively low vacation entitlement and the \"use it or lose it\" clause is common but not always favorable to the employee.",
+      "score": 6
+    },
+    "overtime": {
+      "content": "Overtime may be required at the Employer's discretion. There is no mention of overtime pay rate. This clause gives the employer significant power to require overtime, and the lack of clarity regarding overtime pay could be detrimental to the employee. California law dictates overtime pay, but the contract's silence is concerning.",
+      "score": 3
+    },
+    "termination": {
+      "content": "Either party may terminate the contract with 30 days' written notice. The Employer may terminate the Employee immediately for cause, including but not limited to misconduct or failure to perform duties. Upon termination, the Employee shall not be entitled to severance pay. The \"for cause\" termination allows for immediate termination by the employer. The contract clearly states that there is no severance pay.",
+      "score": 7
+    },
+    "confidentiality": {
+      "content": "The Employee agrees to maintain the confidentiality of all proprietary information and trade secrets of the Employer during and after employment. This is a standard confidentiality clause, broadly worded. Specific definitions of \"proprietary information\" and \"trade secrets\" are missing, creating potential for ambiguity.",
+      "score": 7
+    },
+    "non_compete": {
+      "content": "For a period of one year after termination, the Employee shall not engage in any business that competes with the Employer's core business within a 50-mile radius of the Employer's principal office. The non-compete clause is limited to one year and a 50-mile radius, which may be considered reasonable depending on the specific circumstances. California law heavily restricts non-competes so enforceability needs to be carefully considered.",
+      "score": 6
+    },
+    "intellectual_property": {
+      "content": "There is no clause about intellectual property.",
+      "score": 1
+    },
+    "governing_law": {
+      "content": "This Contract shall be governed by and construed in accordance with the laws of the State of California.",
+      "score": 10
+    },
+    "jurisdiction": {
+      "content": "The jurisdiction is implied as California, as the governing law are the laws of California. More appropriately placed in \"Dispute Resolution.\"",
+      "score": 7
+    },
+    "dispute_resolution": {
+      "content": "Any disputes arising under this Contract shall be resolved through binding arbitration in San Francisco, California, in accordance with the rules of the American Arbitration Association. Binding arbitration is specified as the method for dispute resolution.",
+      "score": 8
+    },
+    "liability": {
+      "content": "The Employer shall not be liable for any damages, losses, or injuries arising from the Employee's performance of duties under this Contract. This clause attempts to limit the employer's liability. Its enforceability would depend on specific circumstances and applicable law. It is very broad and potentially unenforceable.",
+      "score": 4
+    },
+    "salary": {
+      "content": "The Employee shall receive an annual salary of USD 80,000, payable in bi-weekly installments. The salary is subject to deductions for taxes and other withholdings as required by law. It is stated clearly",
+      "score": 10
+    },
+    "benefits": {
+      "content": "There is no clause about benefits.",
+      "score": 1
+    },
+    "work_hours": {
+      "content": "The Employee shall work a minimum of 40 hours per week, with schedules determined by the Employer. Overtime may be required at the Employer's discretion. Minimum hours are specified, however, more detail is beneficial to avoid conflicts.",
+      "score": 6
+    },
+    "performance_evaluation": {
+      "content": "There is no clause about performance evaluation.",
+      "score": 1
+    },
+    "duties": {
+      "content": "The Employer agrees to employ the Employee as a Software Engineer. The Employee shall perform duties as assigned by the Employer, including but not limited to software development, system maintenance, and project management. This is a rather vague and broad description of duties; however, it does state that the list provided is non-exhaustive.",
+      "score": 5
+    },
+    "responsibilities": {
+      "content": "The responsibilities, while not explicitly stated, are implied with the duties, but no clause about responsibilities.",
+      "score": 1
+    }
+  },
+  "summary": {
+    "executive_summary": "The employment contract is a basic agreement that covers essential areas but lacks detail and clarity in several key provisions. It favors the employer, especially in aspects like overtime, liability, and termination conditions, while providing minimal benefits information. The missing intellectual property clause is also a significant oversight.",
+    "key_points": [
+      "Key terms addressed: Salary, duties, vacation, sick leave, termination, confidentiality, overtime, non-compete, liability, dispute resolution, governing law",
+      "The contract is relatively short and simple, potentially leading to disagreements later",
+      "Contract favors employer"
+    ],
+    "potential_issues": [
+      "Vague description of duties",
+      "Lack of clarity on overtime pay",
+      "Missing clauses for Intellectual Property, Benefits, Performance Evaluation and Responsibilities",
+      "Possibly unenforceable non-compete clause given CA law.",
+      "Broad limit of liability for the employer."
+    ],
+    "recommendations": [
+      "Negotiate clearer terms for overtime pay and clarify the extent of required overtime",
+      "Add clauses for intellectual property, benefits, and performance evaluations",
+      "Seek legal counsel to ensure the non-compete clause is enforceable under California law and negotiate acceptable limitations",
+      "Negotiate the liability clause to ensure it is fair to both parties."
+    ]
+  }
+}

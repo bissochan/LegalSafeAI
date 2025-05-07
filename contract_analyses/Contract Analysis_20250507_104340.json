@@ -1,0 +1,100 @@
+{
+  "metadata": {
+    "timestamp": "20250507_104340",
+    "contract_name": "Contract Analysis",
+    "overall_score": 5
+  },
+  "structured_analysis": {
+    "sick_leave": {
+      "content": "The employee is entitled to 5 days of paid sick leave per year. Additional sick leave is at the employer's discretion. This is a relatively low amount of sick leave and leaves the employee potentially vulnerable if they require more sick days.",
+      "score": 5
+    },
+    "vacation": {
+      "content": "The employee is entitled to 10 days of paid vacation per year. Vacation must be approved in advance, and unused days do not carry over. 10 days is a relatively low amount of vacation time compared to standard practices in some industries. The \"use it or lose it\" policy without consideration for extenuating circumstances is not ideal.",
+      "score": 4
+    },
+    "overtime": {
+      "content": "The contract states that overtime may be required at the employer's discretion but does not specify the overtime rate or how overtime will be compensated. This is a significant omission, especially in California, where overtime laws are stringent.",
+      "score": 2
+    },
+    "termination": {
+      "content": "Either party can terminate with 30 days' written notice. The employer can terminate immediately for cause, including misconduct or failure to perform duties. No severance pay is provided upon termination. The lack of severance, even without cause termination, can be unfavorable for the employee. The definition of \"cause\" is broad and potentially subject to interpretation.",
+      "score": 4
+    },
+    "confidentiality": {
+      "content": "The employee agrees to maintain confidentiality of proprietary information and trade secrets during and after employment. This clause is standard but lacks specific definitions of \"proprietary information\" and \"trade secrets\".",
+      "score": 7
+    },
+    "non_compete": {
+      "content": "The employee is restricted from engaging in competing businesses for one year after termination within a 50-mile radius of the employer's principal office. The enforceability of non-compete agreements in California is limited and subject to scrutiny. It is important to determine if this non-compete is necessary to protect trade secrets.",
+      "score": 6
+    },
+    "intellectual_property": {
+      "content": "This contract is missing an intellectual property assignment clause, which is essential for software engineering roles. Without it, the ownership of work created by the employee during their employment is unclear.",
+      "score": 1
+    },
+    "governing_law": {
+      "content": "The contract specifies that California law governs the agreement. This is appropriate given the location of both the employer and employee.",
+      "score": 10
+    },
+    "jurisdiction": {
+      "content": "The venue for dispute resolution is in San Francisco, California - logically consistent with the governing law.",
+      "score": 10
+    },
+    "dispute_resolution": {
+      "content": "Disputes will be resolved through binding arbitration in San Francisco, according to the American Arbitration Association (AAA) rules. Arbitration can be faster and less expensive than litigation, but it also limits appeal options.",
+      "score": 8
+    },
+    "liability": {
+      "content": "The Employer shall not be liable for any damages, losses, or injuries arising from the Employee’s performance of duties under this Contract. This is a broad limitation of liability that may not be fully enforceable and requires further scrutiny. There could be scenarios where the employer would ultimately be responsible under law.",
+      "score": 3
+    },
+    "salary": {
+      "content": "The employee will receive an annual salary of $80,000, paid bi-weekly, subject to standard deductions. This is a straightforward salary clause.",
+      "score": 9
+    },
+    "benefits": {
+      "content": "The contract does NOT mention any benefits besides the specified sick leave and vacation. There is no reference to health insurance, retirement plans, or other standard employee benefits. This is a significant omission.",
+      "score": 1
+    },
+    "work_hours": {
+      "content": "The employee shall work a minimum of 40 hours per week, with schedules determined by the employer. This clause is vague, and clarity around scheduling is recommended.",
+      "score": 6
+    },
+    "performance_evaluation": {
+      "content": "The contract does NOT include any provision for performance evaluations.",
+      "score": 1
+    },
+    "duties": {
+      "content": "The employee will perform duties as assigned, including software development, system maintenance, and project management. The phrasing \"duties as assigned\" is rather broad and could encompass a wide variety of tasks.",
+      "score": 6
+    },
+    "responsibilities": {
+      "content": "There is no specific section dedicated to responsibilities within the contract. Responsibilities are mentioned indirectly as part of the duty section but no clearly defined and bulleted list exists.",
+      "score": 3
+    }
+  },
+  "summary": {
+    "executive_summary": "This contract provides a basic framework for employment, but it is heavily weighted in favor of the employer and lacks crucial details regarding overtime, benefits, intellectual property, and comprehensive liability considerations. The employee should seek legal counsel before signing this contract.",
+    "key_points": [
+      "Basic terms outlined",
+      "Missing critical benefits information",
+      "One-sided liability clause",
+      "Broad definitions of duties"
+    ],
+    "potential_issues": [
+      "Enforceability of non-compete",
+      "Lack of clarity on overtime compensation",
+      "Limited benefits package",
+      "Vague definition of \"cause\" for termination"
+    ],
+    "recommendations": [
+      "Consult with an attorney before signing",
+      "Negotiate for better benefits and time off",
+      "Clarify overtime compensation policies",
+      "Define \"cause\" for termination specifically",
+      "Include intellectual property assignment clause",
+      "Review non-compete enforceability under California law and limit scope."
+    ]
+  }
+}

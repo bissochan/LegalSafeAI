@@ -1,0 +1,103 @@
+{
+  "metadata": {
+    "timestamp": "20250506_224833",
+    "contract_name": "Sample Contract",
+    "overall_score": 5
+  },
+  "structured_analysis": {
+    "sick_leave": {
+      "content": "The contract states that in case of illness, the employee must notify the employer promptly and provide a medical certificate within 48 hours. The economic treatment (compensation) will be as per the law and the applicable Collective Bargaining Agreement (CCNL).",
+      "score": 7
+    },
+    "vacation": {
+      "content": "The employee is entitled to 4 weeks of paid vacation per year, to be agreed upon with the employer, taking into account the company's needs. This is a basic entitlement, and the dependence on mutual agreement is standard.",
+      "score": 7
+    },
+    "overtime": {
+      "content": "Overtime must be pre-approved and will be compensated as required by law. This is a standard clause providing protection against unpaid overtime.",
+      "score": 9
+    },
+    "termination": {
+      "content": "Either party can terminate the contract with 3 months' notice, except in cases of 'just cause' (giusta causa), which allows for immediate termination. The 3-month notice period is typical in Italy.",
+      "score": 8
+    },
+    "confidentiality": {
+      "content": "The employee is obligated to maintain confidentiality regarding company information both during and after employment. This is a standard and important clause.",
+      "score": 9
+    },
+    "non_compete": {
+      "content": "There is NO mention of a non-compete clause in this contract. Its absence severely limits the employer's protection against the employee working for a competitor after leaving the company.",
+      "score": 1
+    },
+    "intellectual_property": {
+      "content": "This contract contains NO clause related to the ownership of intellectual property created by the employee during their employment. This is a significant omission, particularly for a Project Manager role.",
+      "score": 1
+    },
+    "governing_law": {
+      "content": "The contract is governed by Italian law. This is expected and standard for employment in Italy.",
+      "score": 10
+    },
+    "jurisdiction": {
+      "content": "The court of Verona has jurisdiction over any disputes arising from the contract. This sets a specific forum for legal action.",
+      "score": 10
+    },
+    "dispute_resolution": {
+      "content": "The contract does NOT specify any specific dispute resolution mechanisms, such as mediation or arbitration. Disputes will likely default to litigation in the Verona courts.",
+      "score": 2
+    },
+    "liability": {
+      "content": "There is NO explicit mention of liability limitations for either the employer or the employee. Potential legal claims will be handled according to Italian law.",
+      "score": 1
+    },
+    "salary": {
+      "content": "The gross annual salary is €50,000, paid in 13 monthly installments. This covers the basic compensation.",
+      "score": 10
+    },
+    "benefits": {
+      "content": "The contract does NOT detail any specific benefits beyond the statutory requirements. This is a significant omission. Further detail required in additional healthcare, retirement contributions, life insurance, etc.",
+      "score": 2
+    },
+    "work_hours": {
+      "content": "The work schedule is 40 hours per week, Monday to Friday, from 9:00 AM to 6:00 PM, with a one-hour lunch break. This provides clear guidelines for working hours.",
+      "score": 9
+    },
+    "performance_evaluation": {
+      "content": "There is NO mention of performance evaluation processes or frequency. This lack of clarity could lead to uncertainty regarding performance expectations and career development.",
+      "score": 1
+    },
+    "duties": {
+      "content": "The employee's duties are defined as those of a Project Manager, as specified in Annex A. This relies on the annex providing sufficient detail.",
+      "score": 8
+    },
+    "responsibilities": {
+      "content": "The employee is responsible for managing assigned projects, coordinating teams, and meeting deadlines. This clearly outlines key responsibilities.",
+      "score": 8
+    }
+  },
+  "summary": {
+    "executive_summary": "This employment contract is a basic agreement outlining the core terms of employment for a Project Manager in Italy. While covering essential aspects like job title, salary, working hours, and termination, it lacks crucial clauses regarding non-compete, intellectual property, detailed benefits, dispute resolution, liability, and performance evaluations. The heavy reliance on the CCNL might address some omissions, but specified clauses would improve clarity and protection.",
+    "key_points": [
+      "Key terms of employment are defined",
+      "Complies with Italian law regarding working hours, vacation, and termination",
+      "Annex A provides further details on duties",
+      "Contract is for an indefinite duration"
+    ],
+    "potential_issues": [
+      "Absence of a non-compete clause",
+      "Lack of intellectual property ownership clauses",
+      "Insufficient detail on benefits",
+      "No explicit dispute resolution process",
+      "Lack of performance review information",
+      "No liability coverage addressed."
+    ],
+    "recommendations": [
+      "Include a non-compete clause (if desired and permissible under Italian Law)",
+      "Include clauses regarding intellectual property ownership",
+      "Detail all employee benefits clearly",
+      "Specify a dispute resolution mechanism (mediation/arbitration)",
+      "Add a performance evaluation process",
+      "Clarify liability limitations",
+      "Review Annex A and ensure comprehensive description of job responsibilities."
+    ]
+  }
+}
