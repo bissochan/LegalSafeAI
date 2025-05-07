@@ -239,9 +239,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 if __name__ == '__main__':
     # Schedule session cleanup
-    #scheduler = BackgroundScheduler()
-    #scheduler.add_job(cleanup_old_sessions, 'interval', hours=1)
-    #scheduler.start()
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(cleanup_old_sessions, 'interval', hours=1)
+    scheduler.start()
 
     try:
         # Get port from environment variable or default to 5000 for local dev
