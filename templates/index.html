@@ -621,12 +621,40 @@
       .chat-message li {
         margin: 0.25rem 0;
       }
+
+      .language-select {
+        padding: 0.5rem;
+        border: 1px solid var(--border-color);
+        border-radius: 0.5rem;
+        background: var(--background-color);
+        color: var(--text-primary);
+        font-size: 0.9rem;
+        cursor: pointer;
+        margin: 1rem;
+      }
+
+      .header-controls {
+        display: flex;
+        justify-content: flex-end;
+        padding: 1rem;
+        background: var(--card-background);
+        border-bottom: 1px solid var(--border-color);
+      }
     </style>
   </head>
   <body>
     <div class="container">
       <div class="header">
         <h1>LegalSafeAI Contract Analyzer</h1>
+        <div class="header-controls">
+          <select id="languageSelect" class="language-select" onchange="changeLanguage()">
+            <option value="en">English</option>
+            <option value="es">Español</option>
+            <option value="fr">Français</option>
+            <option value="it">Italiano</option>
+            <option value="de">Deutsch</option>
+          </select>
+        </div>
       </div>
 
       <div id="errorMessage" class="error-message"></div>
@@ -694,6 +722,13 @@
     </div>
 
     <script>
+      let currentLanguage = 'en';
+
+      function changeLanguage() {
+        currentLanguage = document.getElementById('languageSelect').value;
+        localStorage.setItem('preferredLanguage', currentLanguage);
+      }
+
       function updateProgress(step, total, message) {
         const progressSection = document.querySelector(".progress-section");
         const progressFill = document.querySelector(".progress-fill");
@@ -869,61 +904,53 @@
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
 
-      document
-        .getElementById("uploadForm")
-        .addEventListener("submit", async (e) => {
-          e.preventDefault();
+      async function handleUpload(event) {
+        event.preventDefault();
 
-          // Clear previous error and results
-          document.getElementById("errorMessage").style.display = "none";
-          document.getElementById("results").style.display = "none";
+        const formData = new FormData();
+        const fileInput = document.getElementById('contractFile');
+        formData.append('file', fileInput.files[0]);
+        formData.append('language', currentLanguage); // Add language to request
 
-          const formData = new FormData();
-          const fileInput = document.getElementById("contractFile");
+        const progressSection = document.querySelector(".progress-section");
+        progressSection.style.display = "block";
+        updateProgress(0, 5, "Starting analysis...");
 
-          if (!fileInput.files.length) {
-            showError("Please select a PDF file");
+        try {
+          const response = await fetch("/analyze", {
+            method: "POST",
+            body: formData,
+          });
+
+          const result = await response.json();
+
+          if (result.status === "error") {
+            showError(result.message, result.details);
+            progressSection.style.display = "none";
             return;
           }
 
-          formData.append("file", fileInput.files[0]);
-
-          // Show progress section
-          const progressSection = document.querySelector(".progress-section");
-          progressSection.style.display = "block";
-          updateProgress(0, 5, "Starting analysis...");
-
-          try {
-            const response = await fetch("/analyze", {
-              method: "POST",
-              body: formData,
-            });
-
-            const result = await response.json();
-
-            if (result.status === "error") {
-              showError(result.message, result.details);
-              progressSection.style.display = "none";
-              return;
-            }
-
-            if (result.status === "progress") {
-              updateProgress(result.step, result.total_steps, result.message);
-              return;
-            }
-
-            if (result.status === "success") {
-              // Hide progress
-              progressSection.style.display = "none";
-
-              // Display results
-              displayResults(result.data);
-            }
-          } catch (error) {
-            showError("Error processing contract", error.message);
-            progressSection.style.display = "none";
+          if (result.status === "progress") {
+            updateProgress(result.step, result.total_steps, result.message);
+            return;
           }
-        });
+
+          if (result.status === "success") {
+            // Hide progress
+            progressSection.style.display = "none";
+
+            // Display results
+            displayResults(result.data);
+          }
+        } catch (error) {
+          showError("Error processing contract", error.message);
+          progressSection.style.display = "none";
+        }
+      }
+
+      document
+        .getElementById("uploadForm")
+        .addEventListener("submit", handleUpload);
 
       function initializeChat() {
         const chatInput = document.getElementById("chatInput");
@@ -943,6 +970,11 @@
 
         if (!message) return;
 
+        const chatData = {
+          message: message,
+          language: currentLanguage,
+        };
+
         // Add user message
         chatMessages.innerHTML += `
                 <div class="message user-message">
@@ -959,7 +991,7 @@
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify({ message }),
+            body: JSON.stringify(chatData),
           });
 
           const result = await response.json();
@@ -985,8 +1017,15 @@
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
 
-      // Initialize chat when page loads
-      document.addEventListener("DOMContentLoaded", initializeChat);
+      // Add language initialization
+      document.addEventListener('DOMContentLoaded', () => {
+        const savedLanguage = localStorage.getItem('preferredLanguage');
+        if (savedLanguage) {
+          document.getElementById('languageSelect').value = savedLanguage;
+          currentLanguage = savedLanguage;
+        }
+        initializeChat();
+      });
     </script>
   </body>
 </html>

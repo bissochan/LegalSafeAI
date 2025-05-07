@@ -20,8 +20,8 @@ class ResponseEvaluator:
         # Modelli per la valutazione
         self.models = [
             "google/gemini-2.0-flash-001",
-            "openai/gpt-4o",
-            "meta-llama/llama-3.1-70b-instruct"
+            #"openai/gpt-4o",
+            #"meta-llama/llama-3.1-70b-instruct"
         ]
         
         # Threshold per considerare la risposta corretta

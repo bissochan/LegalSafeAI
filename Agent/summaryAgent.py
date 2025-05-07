@@ -4,7 +4,9 @@ from pydantic import BaseModel, Field
 from typing import Optional, Dict
 import requests
 import json
+import re
 from datetime import datetime
+from time import sleep
 
 class ContractField(BaseModel):
     content: str = Field(description="The content of the field")
@@ -56,14 +58,13 @@ class ContractAnalyzerAgent:
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
         
-    def analyze(self, contract: str, contract_name: str = None) -> ContractAnalysisResult:
+    def analyze(self, contract_text: str, language: str = 'en') -> Dict:
+        system_prompt = f"""Analyze this contract and provide a structured analysis in {language}.
+        Return the response as a pure JSON object without any Markdown code block markers (e.g., ```json or ```).
+        Ensure the JSON is syntactically correct, with proper commas between fields and no trailing commas.
+        Maintain this exact JSON structure, even if responding in a language different from English. The structure's field names must remain in English, but the content should be in the specified language ({language}).
         """
-        Analyze the contract and provide both structured and narrative analysis.
         
-        Args:
-            contract: The contract text to analyze
-            contract_name: Optional name for the contract
-        """
         url = "https://openrouter.ai/api/v1/chat/completions"
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -171,39 +172,96 @@ class ContractAnalyzerAgent:
         END_ASSESSMENT
 
         Contract to analyze:
-        {contract}
+        {contract_text}
         """
         
         data = {
             "model": "google/gemini-2.0-flash-001",
             "messages": [
-                {"role": "system", "content": "You are an expert legal analyst specialized in employment contracts. Provide detailed, structured analysis."},
+                {"role": "system", "content": system_prompt},
                 {"role": "user", "content": prompt}
             ]
         }
         
-        try:
-            response = requests.post(url, headers=headers, json=data)
-            response.raise_for_status()
-            result = response.json()
-            
-            if "choices" in result and len(result["choices"]) > 0:
-                content = result["choices"][0]["message"]["content"]
-                # Add debug print to see raw API response
-                #print("Raw API response:", content)
-                analysis_result = self._parse_response(content)
-                return analysis_result
-            else:
-                raise ValueError("No valid response from API")
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response = requests.post(url, headers=headers, json=data)
+                response.raise_for_status()
+                result = response.json()
                 
-        except Exception as e:
-            print(f"Error calling API: {e}")
-            raise
+                if "choices" in result and len(result["choices"]) > 0:
+                    content = result["choices"][0]["message"]["content"]
+                    if not content:
+                        raise ValueError("Empty response content from API")
+                    #print("Raw API response:", content)
+                    analysis_result = self._parse_response(content)
+                    return analysis_result
+                else:
+                    raise ValueError("No valid response from API")
+                    
+            except requests.exceptions.RequestException as e:
+                if attempt == max_retries - 1:
+                    print(f"Error calling API after {max_retries} attempts: {e}")
+                    raise
+                print(f"API request failed: {e}. Retrying in {2 ** attempt} seconds...")
+                sleep(2 ** attempt)
+            except Exception as e:
+                print(f"Error processing API response: {e}")
+                raise
 
     def _parse_response(self, content: str) -> ContractAnalysisResult:
-        """Parse the API response using regex for more reliable extraction."""
-        import re
-        
+        """Parse the API response into a ContractAnalysisResult, handling various response formats."""
+        # Save raw content for debugging
+        debug_file = os.path.join(self.output_dir, f"raw_response_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
+        try:
+            with open(debug_file, 'w', encoding='utf-8') as f:
+                f.write(content)
+        except Exception as e:
+            print(f"Warning: Could not save raw response to {debug_file}: {e}")
+
+        # Clean the response: remove Markdown code block markers and extra whitespace
+        cleaned_content = content.strip()
+        cleaned_content = re.sub(r'^```json\s*|\s*```$', '', cleaned_content, flags=re.MULTILINE)
+        cleaned_content = cleaned_content.strip()
+
+        # Fix common JSON syntax errors
+        # 1. Add colon to END_SUMMARY if missing (e.g., "END_SUMMARY" -> "END_SUMMARY": "")
+        cleaned_content = re.sub(r'("END_SUMMARY")\s*([,\}])', r'\1: ""\2', cleaned_content)
+        # 2. Add colon to END_ASSESSMENT if missing (e.g., "END_ASSESSMENT" -> "END_ASSESSMENT": "")
+        cleaned_content = re.sub(r'("END_ASSESSMENT")\s*([,\}])', r'\1: ""\2', cleaned_content)
+        # 3. Replace END_ASSESSMENT: null with END_ASSESSMENT: ""
+        cleaned_content = re.sub(r'("END_ASSESSMENT":\s*)null', r'\1""', cleaned_content)
+        # 4. Add comma before "END_FIELD" if missing (for older responses)
+        cleaned_content = re.sub(r'("SCORE":\s*\d+)\s+("END_FIELD")', r'\1,\2', cleaned_content)
+        # 5. Ensure END_FIELD is properly formatted as key-value pair
+        cleaned_content = re.sub(r'("END_FIELD")\s*([,\}])', r'\1: ""\2', cleaned_content)
+        # 6. Replace END_FIELD: null with END_FIELD: ""
+        cleaned_content = re.sub(r'("END_FIELD":\s*)null', r'\1""', cleaned_content)
+        # 7. Add comma before END_ASSESSMENT if missing (for older responses)
+        cleaned_content = re.sub(r'("RECOMMENDATIONS":\s*".*?")\s+("END_ASSESSMENT")', r'\1,\2', cleaned_content, flags=re.DOTALL)
+
+        # Attempt to parse the cleaned JSON
+        try:
+            data = json.loads(cleaned_content)
+        except json.JSONDecodeError as e:
+            print(f"Error decoding JSON: {e}")
+            print("Cleaned content:")
+            print(cleaned_content)
+            # Save cleaned content for further debugging
+            cleaned_debug_file = os.path.join(self.output_dir, f"cleaned_response_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt")
+            try:
+                with open(cleaned_debug_file, 'w', encoding='utf-8') as f:
+                    f.write(cleaned_content)
+                print(f"Cleaned content saved to: {cleaned_debug_file}")
+            except Exception as ex:
+                print(f"Warning: Could not save cleaned content to {cleaned_debug_file}: {ex}")
+            raise ValueError("Invalid JSON format in response after cleaning")
+
+        # Validate the response structure
+        if not isinstance(data, dict):
+            raise ValueError("Response is not a valid JSON object")
+
         # Initialize default fields
         default_fields = {
             'sick_leave': ContractField(content="", score=None),
@@ -225,57 +283,67 @@ class ContractAnalyzerAgent:
             'responsibilities': ContractField(content="", score=None),
         }
 
-        try:
-            # Parse overall assessment
-            overall_pattern = r'OVERALL_ASSESSMENT:\s*SCORE:\s*(\d+)\s*EXECUTIVE_SUMMARY:\s*(.*?)\s*KEY_POINTS:\s*(.*?)\s*POTENTIAL_ISSUES:\s*(.*?)\s*RECOMMENDATIONS:\s*(.*?)\s*END_ASSESSMENT'
-            overall_match = re.search(overall_pattern, content, re.DOTALL)
-            
-            if not overall_match:
-                raise ValueError("Failed to parse OVERALL_ASSESSMENT section")
-                
-            overall_score = int(overall_match.group(1))
-            exec_summary = overall_match.group(2).strip()
-            key_points = overall_match.group(3).strip()
-            potential_issues = overall_match.group(4).strip()
-            recommendations = overall_match.group(5).strip()
+        # Parse field analysis
+        field_analysis = data.get('FIELD_ANALYSIS', {})
+        if not isinstance(field_analysis, dict):
+            print("Warning: FIELD_ANALYSIS is missing or invalid. Using default empty fields.")
+            field_analysis = {}
 
-            # Parse field analysis
-            field_pattern = r'(\w+):\s*CONTENT:\s*(.*?)\s*SCORE:\s*(\d+)\s*END_FIELD'
-            field_matches = re.finditer(field_pattern, content, re.DOTALL)
-            
-            fields_found = 0
-            for match in field_matches:
-                field_name = match.group(1).lower().strip()
-                content_text = match.group(2).strip()
-                score = int(match.group(3))
-                
-                if field_name in default_fields:
-                    default_fields[field_name] = ContractField(
-                        content=content_text,
-                        score=score
-                    )
-                    fields_found += 1
-            
-            if fields_found == 0:
-                print("Warning: No fields found in FIELD_ANALYSIS")
-
-            return ContractAnalysisResult(
-                structured_analysis=ContractAnalysis(
-                    **default_fields,
-                    overall_score=overall_score
-                ),
-                summary=ContractSummary(
-                    executive_summary=exec_summary,
-                    key_points=key_points.replace("|", "\n"),
-                    potential_issues=potential_issues.replace("|", "\n"),
-                    recommendations=recommendations.replace("|", "\n")
+        for field_name, field_data in field_analysis.items():
+            if field_name.lower() in default_fields:
+                if not isinstance(field_data, dict):
+                    print(f"Warning: Invalid data for field {field_name}. Skipping.")
+                    continue
+                content = field_data.get('CONTENT', '')
+                score = field_data.get('SCORE')
+                # Validate score
+                if score is not None:
+                    try:
+                        score = int(score)
+                        if not 1 <= score <= 10:
+                            print(f"Warning: Invalid score {score} for {field_name}. Setting to None.")
+                            score = None
+                    except (TypeError, ValueError):
+                        print(f"Warning: Invalid score format for {field_name}. Setting to None.")
+                        score = None
+                default_fields[field_name.lower()] = ContractField(
+                    content=str(content),
+                    score=score
                 )
+
+        # Parse overall assessment
+        overall = data.get('OVERALL_ASSESSMENT', {})
+        if not isinstance(overall, dict):
+            print("Warning: OVERALL_ASSESSMENT is missing or invalid. Using defaults.")
+            overall = {}
+
+        overall_score = overall.get('SCORE')
+        try:
+            overall_score = int(overall_score) if overall_score is not None else None
+            if overall_score is not None and not 1 <= overall_score <= 10:
+                print(f"Warning: Invalid overall score {overall_score}. Setting to None.")
+                overall_score = None
+        except (TypeError, ValueError):
+            print("Warning: Invalid overall score format. Setting to None.")
+            overall_score = None
+
+        exec_summary = str(overall.get('EXECUTIVE_SUMMARY', ''))
+        key_points = str(overall.get('KEY_POINTS', '')).split('|')
+        potential_issues = str(overall.get('POTENTIAL_ISSUES', '')).split('|')
+        recommendations = str(overall.get('RECOMMENDATIONS', '')).split('|')
+
+        return ContractAnalysisResult(
+            structured_analysis=ContractAnalysis(
+                **default_fields,
+                overall_score=overall_score
+            ),
+            summary=ContractSummary(
+                executive_summary=exec_summary,
+                key_points='\n'.join(p.strip() for p in key_points if p.strip()),
+                potential_issues='\n'.join(p.strip() for p in potential_issues if p.strip()),
+                recommendations='\n'.join(r.strip() for r in recommendations if r.strip())
             )
-        except Exception as e:
-            print(f"Error parsing response: {e}")
-            print("Raw content:")
-            print(content)
-            raise
+        )
 
     def save_analysis(self, analysis_result: ContractAnalysisResult, contract_name: str = None):
         """Save the complete analysis results to a JSON file."""
@@ -346,102 +414,3 @@ class ContractAnalyzerAgent:
         except:
             pass
         return None
-
-    def print_analysis(self, analysis_result: ContractAnalysisResult):
-        """
-        Print the analysis results in a clean and formatted way.
-        
-        Args:
-            analysis_result: The ContractAnalysisResult to print
-        """
-        print("\n" + "="*50)
-        print("CONTRACT ANALYSIS REPORT")
-        print("="*50 + "\n")
-
-        # Print Structured Analysis
-        print("STRUCTURED ANALYSIS")
-        print("-"*30)
-        structured = analysis_result.structured_analysis
-        
-        for field_name, field in structured.__class__.model_fields.items():
-            value = getattr(structured, field_name)
-            if value is not None:
-                field_display = field_name.replace('_', ' ').title()
-                
-                if field_name == 'overall_score':
-                    print(f"\n{field_display}: {value}/10")
-                else:
-                    print(f"\n{field_display}:")
-                    print(f"Score: {value.score if value.score else 'N/A'}/10")
-                    print(f"Analysis: {value.content}")
-                    print("-" * 30)
-
-        # Print Narrative Summary
-        print("\n" + "="*50)
-        print("NARRATIVE SUMMARY")
-        print("="*50)
-        
-        summary = analysis_result.summary
-        
-        print("\nEXECUTIVE SUMMARY:")
-        print("-"*30)
-        print(summary.executive_summary)
-        
-        print("\nKEY POINTS:")
-        print("-"*30)
-        print(summary.key_points)
-        
-        print("\nPOTENTIAL ISSUES:")
-        print("-"*30)
-        print(summary.potential_issues)
-        
-        print("\nRECOMMENDATIONS:")
-        print("-"*30)
-        print(summary.recommendations)
-        
-        print("\n" + "="*50 + "\n")
-
-
-if __name__ == "__main__":
-    analyzer = ContractAnalyzerAgent()
-
-    sample_contract = """
-    Articolo 1: Assunzione
-    Il Sig. Rossi (Dipendente) è assunto da Bianchi S.p.A. (Datore di Lavoro) con un contratto a tempo indeterminato a partire dal 01/06/2025.
-
-    Articolo 2: Mansioni e Responsabilità
-    Il Dipendente svolgerà le mansioni di Project Manager, come specificato nell'allegato A. Sarà responsabile della gestione dei progetti assegnati, del coordinamento dei team e del rispetto delle scadenze. (Punteggio: 8)
-
-    Articolo 3: Orario di Lavoro
-    L'orario di lavoro è fissato in 40 ore settimanali, dal lunedì al venerdì, dalle 9:00 alle 18:00 con un'ora di pausa pranzo. Eventuali ore straordinarie dovranno essere preventivamente autorizzate e saranno retribuite come previsto dalla legge. (Punteggio: 9)
-
-    Articolo 4: Retribuzione
-    La retribuzione lorda annua è di €50.000, pagata in 13 mensilità. (Punteggio: 10)
-
-    Articolo 5: Ferie
-    Il Dipendente ha diritto a 4 settimane di ferie retribuite all'anno, da concordarsi con il Datore di Lavoro tenendo conto delle esigenze aziendali. (Punteggio: 7)
-
-    Articolo 6: Congedo per Malattia
-    In caso di malattia, il Dipendente dovrà avvisare tempestivamente il Datore di Lavoro e presentare il certificato medico entro 48 ore. Il trattamento economico sarà quello previsto dalla legge e dal CCNL applicato. (Punteggio: 7)
-
-    Articolo 7: Cessazione del Contratto
-    Il presente contratto può essere risolto da ciascuna delle parti con un preavviso di 3 mesi, salvo giusta causa. (Punteggio: 8)
-
-    Articolo 8: Riservatezza
-    Il Dipendente si impegna a mantenere la massima riservatezza su tutte le informazioni aziendali di cui verrà a conoscenza durante il rapporto di lavoro e anche dopo la sua cessazione. (Punteggio: 9)
-
-    Articolo 9: Legge Applicabile e Foro Competente
-    Il presente contratto è regolato dalla legge italiana. Per qualsiasi controversia derivante dal presente contratto, sarà competente il Foro di Verona. (Punteggio: 10)
-
-    Punteggio Complessivo del Contratto: 8
-    """
-
-    try:
-        result = analyzer.analyze(sample_contract, contract_name="Sample Contract")
-        analyzer.print_analysis(result)
-        
-        # Save to JSON file
-        json_path = analyzer.save_analysis(result, "Sample Contract")
-        print(f"\nFull analysis saved to: {json_path}")
-    except Exception as e:
-        print(f"Error analyzing contract: {e}")

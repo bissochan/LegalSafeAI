@@ -13,26 +13,44 @@ class ShadowAgent:
         if not self.api_key:
             raise ValueError("API key not found. Please set OPENROUTER_API_KEY in your .env file.")
 
-        # Placeholder contract
-        self.placeholder_contract = """
-        This is a contract between the parties. The parties agree to the following terms and conditions. 
-        The first party shall provide services to the second party. The second party shall pay the first 
-        party a fee of $1000. The first party shall not be liable for any damages arising from the services 
-        provided. The contract shall be governed by the laws of the state of California.
-        """
 
-    def analyze(self, contract=None):
+    def analyze(self, contract_text: str, language: str = 'en') -> str:
         """
-        Analyze the provided contract for gray areas. If no contract is provided, use the placeholder contract.
+        Analyze the provided contract for gray areas in the specified language.
 
         Args:
-            contract (str): The contract to analyze.
+            contract_text (str): The contract to analyze.
+            language (str): The language for the analysis response.
 
         Returns:
             str: The analysis result from the model.
         """
-        if not contract:
-            contract = self.placeholder_contract
+        if not contract_text:
+            contract_text = ""
+
+        # Add language to system prompt
+        system_prompt = f"""Analyze this employment contract and respond in {language}.
+        Follow this template for your response:
+        Act as an experienced legal consultant tasked with thoroughly analyzing a contract. 
+        Your primary goal is to identify any areas of ambiguity, potential pitfalls, unfavorable clauses, 
+        formal errors, or defects within the contract that could pose risks or uncertainties for my client.
+
+        Specifically, I need you to:
+
+            respond in {language}
+            Clearly highlight each section or clause that you deem problematic or unclear.
+            Explain concisely and understandably the nature of the identified issue and its potential implications.
+            Suggest possible modifications or additions to the contract to resolve ambiguities or mitigate risks.
+            Pay close attention to:
+                Unclear or missing definitions.
+                Broad or unspecific liability exclusion clauses.
+                Ambiguous or potentially burdensome termination clauses.
+                Unclear payment terms and penalties.
+                Clauses related to intellectual property (if applicable).
+                Governing law and jurisdiction clauses (if applicable).
+                Any discrepancies or contradictions between different clauses.
+            Provide a concise summary of the main critical points identified.
+            Always respond kind and polite."""
 
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
@@ -44,29 +62,11 @@ class ShadowAgent:
                 "messages": [
                     {
                         "role": "system",
-                        "content": """Act as an experienced legal consultant tasked with thoroughly analyzing a contract. 
-                        Your primary goal is to identify any areas of ambiguity, potential pitfalls, unfavorable clauses, 
-                        formal errors, or defects within the contract that could pose risks or uncertainties for my client.
-
-                        Specifically, I need you to:
-
-                            Clearly highlight each section or clause that you deem problematic or unclear.
-                            Explain concisely and understandably the nature of the identified issue and its potential implications.
-                            Suggest possible modifications or additions to the contract to resolve ambiguities or mitigate risks.
-                            Pay close attention to:
-                                Unclear or missing definitions.
-                                Broad or unspecific liability exclusion clauses.
-                                Ambiguous or potentially burdensome termination clauses.
-                                Unclear payment terms and penalties.
-                                Clauses related to intellectual property (if applicable).
-                                Governing law and jurisdiction clauses (if applicable).
-                                Any discrepancies or contradictions between different clauses.
-                            Provide a concise summary of the main critical points identified.
-                            Always respond kind and polite."""
+                        "content": system_prompt
                     },
                     {
                         "role": "user",
-                        "content": f"Hi, this is a contract, can you analyze if it is shady for me?\nContract: {contract}"
+                        "content": f"Hi, this is a contract, can you analyze if it is shady for me? is important that you respond in {language}\nContract: {contract_text}"
                     }
                 ]
             })
