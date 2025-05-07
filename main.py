@@ -1,8 +1,8 @@
-from Agent.shadowAgent import ShadowAgent
-from Agent.pdfExtractor import PdfTextExtractor
-from Agent.summaryAgent import ContractAnalyzerAgent
-from Agent.ResponseEvaluatorAgent import ResponseEvaluator
-from jsonHandler import add_agent_response_and_scores
+from api.Agent.shadowAgent import ShadowAgent
+from api.Agent.pdfExtractor import PdfTextExtractor
+from api.Agent.summaryAgent import ContractAnalyzerAgent
+from api.Agent.ResponseEvaluatorAgent import ResponseEvaluator
+from api.jsonHandler import add_agent_response_and_scores
 import json
 
 if __name__ == "__main__":

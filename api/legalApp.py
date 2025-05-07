@@ -38,12 +38,14 @@ Session(app)
 if not os.path.exists(app.config['SESSION_FILE_DIR']):
     os.makedirs(app.config['SESSION_FILE_DIR'])
 
-app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max file size
+app.config['UPLOAD_FOLDER'] = '/tmp/Uploads'
+app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'
 
-# Ensure upload folder exists
 if not os.path.exists(app.config['UPLOAD_FOLDER']):
     os.makedirs(app.config['UPLOAD_FOLDER'])
+if not os.path.exists(app.config['SESSION_FILE_DIR']):
+    os.makedirs(app.config['SESSION_FILE_DIR'])
+
 
 # Initialize agents
 shadow_agent = ShadowAgent()
@@ -237,9 +239,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 
 if __name__ == '__main__':
     # Schedule session cleanup
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(cleanup_old_sessions, 'interval', hours=1)
-    scheduler.start()
+    #scheduler = BackgroundScheduler()
+    #scheduler.add_job(cleanup_old_sessions, 'interval', hours=1)
+    #scheduler.start()
 
     try:
         # Get port from environment variable or default to 5000 for local dev
@@ -247,4 +249,5 @@ if __name__ == '__main__':
         # Run Flask app for local development, binding to 0.0.0.0
         app.run(host='0.0.0.0', port=port, debug=True)
     except (KeyboardInterrupt, SystemExit):
-        scheduler.shutdown()
+        #scheduler.shutdown()
+        pass
