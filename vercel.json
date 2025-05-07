@@ -6,10 +6,15 @@
         "use": "@vercel/python"
       }
     ],
-    "routes": [
-      {
-        "src": "/(.*)",
-        "dest": "api/legalApp.py"
+    "functions": {
+      "api/**": {
+        "memory": 1024,
+        "maxDuration": 10
       }
+    },
+    "routes": [
+      { "src": "/", "dest": "/api/legalApp.py" },
+      { "src": "/analyze", "dest": "/api/legalApp.py" },
+      { "src": "/chat", "dest": "/api/legalApp.py" }
     ]
   }
