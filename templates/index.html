@@ -63,6 +63,7 @@
         display: flex;
         align-items: center;
         gap: 1rem;
+        padding: 1rem;
       }
 
       .file-input {
@@ -89,9 +90,7 @@
       }
 
       .progress-section {
-        margin: 2rem 0;
-        position: relative;
-        padding: 1rem 0;
+        display: none;
       }
 
       .progress-step {
@@ -623,14 +622,37 @@
       }
 
       .language-select {
-        padding: 0.5rem;
+        padding: 0.75rem;
         border: 1px solid var(--border-color);
         border-radius: 0.5rem;
         background: var(--background-color);
         color: var(--text-primary);
         font-size: 0.9rem;
         cursor: pointer;
-        margin: 1rem;
+        min-width: 120px;
+      }
+
+      .analysis-status {
+        text-align: center;
+        padding: 1rem;
+        color: var(--primary-color);
+        font-weight: 500;
+      }
+
+      @keyframes blink {
+        0% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+        100% {
+          opacity: 1;
+        }
+      }
+
+      .blink {
+        animation: blink 1.5s infinite;
       }
 
       .header-controls {
@@ -646,15 +668,6 @@
     <div class="container">
       <div class="header">
         <h1>LegalSafeAI Contract Analyzer</h1>
-        <div class="header-controls">
-          <select id="languageSelect" class="language-select" onchange="changeLanguage()">
-            <option value="en">English</option>
-            <option value="es">Español</option>
-            <option value="fr">Français</option>
-            <option value="it">Italiano</option>
-            <option value="de">Deutsch</option>
-          </select>
-        </div>
       </div>
 
       <div id="errorMessage" class="error-message"></div>
@@ -668,14 +681,19 @@
             accept=".pdf"
             required
           />
-          <button type="submit" class="btn">Analyze Contract</button>
+          <select id="languageSelect" class="language-select" onchange="changeLanguage()">
+            <option value="en">English</option>
+            <option value="es">Español</option>
+            <option value="fr">Français</option>
+            <option value="it">Italiano</option>
+            <option value="de">Deutsch</option>
+          </select>
+          <button type="submit" class="btn analyze-btn">
+            <span class="btn-text" data-lang-key="analyze_contract">Analyze Contract</span>
+          </button>
         </form>
-
-        <div class="progress-section" style="display: none">
-          <div class="progress-bar">
-            <div class="progress-fill" style="width: 0%"></div>
-          </div>
-          <p id="statusMessage" class="status-text"></p>
+        <div id="analysisStatus" class="analysis-status" style="display: none">
+          <span class="blink" data-lang-key="performing_analysis">Performing Contract Analysis...</span>
         </div>
       </div>
 
@@ -683,7 +701,7 @@
         <!-- Contract Analysis Summary -->
         <div class="card analysis-section">
           <div class="section-header">
-            <h2>Contract Analysis</h2>
+            <h2 data-lang-key="contract_analysis">Contract Analysis</h2>
             <div class="score-badge" id="summaryScore"></div>
           </div>
           <div id="summaryContent" class="analysis-content"></div>
@@ -691,14 +709,14 @@
 
         <!-- Scores Section -->
         <div class="card scores-section">
-          <h3>Contract Section Scores</h3>
+          <h3 data-lang-key="section_scores">Contract Section Scores</h3>
           <div id="scoresGrid" class="scores-grid"></div>
         </div>
 
         <!-- Shadow Analysis -->
         <div class="card analysis-section">
           <div class="section-header">
-            <h2>Shadow Analysis</h2>
+            <h2 data-lang-key="shadow_analysis">Shadow Analysis</h2>
             <div class="score-badge" id="shadowScore"></div>
           </div>
           <div id="shadowContent" class="analysis-content"></div>
@@ -706,7 +724,7 @@
 
         <!-- Chat Section -->
         <div class="card chat-section">
-          <h3>Ask Questions About the Contract</h3>
+          <h3 data-lang-key="ask_questions">Ask Questions About the Contract</h3>
           <div id="chatMessages" class="chat-messages"></div>
           <div class="chat-input-container">
             <input
@@ -714,8 +732,9 @@
               id="chatInput"
               class="chat-input"
               placeholder="Ask a question about the contract..."
+              data-lang-key="chat_placeholder"
             />
-            <button class="btn" onclick="sendMessage()">Send</button>
+            <button class="btn" onclick="sendMessage()" data-lang-key="send">Send</button>
           </div>
         </div>
       </div>
@@ -724,9 +743,128 @@
     <script>
       let currentLanguage = 'en';
 
+      // Add translations object
+      const translations = {
+  en: {
+    analyze_contract: "Analyze Contract",
+    performing_analysis: "Performing Contract Analysis...",
+    contract_analysis: "Contract Analysis",
+    section_scores: "Contract Section Scores",
+    shadow_analysis: "Shadow Analysis",
+    ask_questions: "Ask Questions About the Contract",
+    analysis_accuracy: "Analysis Accuracy",
+    overall_score: "Overall Score",
+    executive_summary: "Executive Summary",
+    key_points: "Key Points",
+    potential_issues: "Potential Issues",
+    recommendations: "Recommendations",
+    send: "Send",
+    chat_placeholder: "Ask a question about the contract...",
+    error_message: "An error occurred while processing your request",
+    error_prefix: "Error",
+    no_response: "No response received"
+  },
+  es: {
+    analyze_contract: "Analizar Contrato",
+    performing_analysis: "Analizando Contrato...",
+    contract_analysis: "Análisis del Contrato",
+    section_scores: "Puntuaciones por Sección",
+    shadow_analysis: "Análisis Detallado",
+    ask_questions: "Preguntas sobre el Contrato",
+    analysis_accuracy: "Precisión del Análisis",
+    overall_score: "Puntuación Global",
+    executive_summary: "Resumen Ejecutivo",
+    key_points: "Puntos Clave",
+    potential_issues: "Problemas Potenciales",
+    recommendations: "Recomendaciones",
+    send: "Enviar",
+    chat_placeholder: "Haz una pregunta sobre el contrato...",
+    error_message: "Ocurrió un error al procesar su solicitud",
+    error_prefix: "Error",
+    no_response: "No se recibió respuesta"
+  },
+  fr: {
+    analyze_contract: "Analyser le Contrat",
+    performing_analysis: "Analyse du Contrat en Cours...",
+    contract_analysis: "Analyse du Contrat",
+    section_scores: "Scores par Section",
+    shadow_analysis: "Analyse Approfondie",
+    ask_questions: "Poser des Questions sur le Contrat",
+    analysis_accuracy: "Précision de l'Analyse",
+    overall_score: "Score Global",
+    executive_summary: "Résumé Exécutif",
+    key_points: "Points Clés",
+    potential_issues: "Problèmes Potentiels",
+    recommendations: "Recommandations",
+    send: "Envoyer",
+    chat_placeholder: "Posez une question sur le contrat...",
+    error_message: "Une erreur s'est produite lors du traitement de votre demande",
+    error_prefix: "Erreur",
+    no_response: "Aucune réponse reçue"
+  },
+  it: {
+    analyze_contract: "Analizza Contratto",
+    performing_analysis: "Analisi del Contratto in Corso...",
+    contract_analysis: "Analisi del Contratto",
+    section_scores: "Punteggi per Sezione",
+    shadow_analysis: "Analisi Dettagliata",
+    ask_questions: "Fai Domande sul Contratto",
+    analysis_accuracy: "Precisione dell'Analisi",
+    overall_score: "Punteggio Complessivo",
+    executive_summary: "Riepilogo Esecutivo",
+    key_points: "Punti Chiave",
+    potential_issues: "Problemi Potenziali",
+    recommendations: "Raccomandazioni",
+    send: "Invia",
+    chat_placeholder: "Fai una domanda sul contratto...",
+    error_message: "Si è verificato un errore durante l'elaborazione della richiesta",
+    error_prefix: "Errore",
+    no_response: "Nessuna risposta ricevuta"
+  },
+  de: {
+    analyze_contract: "Vertrag Analysieren",
+    performing_analysis: "Vertragsanalyse läuft...",
+    contract_analysis: "Vertragsanalyse",
+    section_scores: "Bewertungen nach Abschnitt",
+    shadow_analysis: "Detaillierte Analyse",
+    ask_questions: "Fragen zum Vertrag",
+    analysis_accuracy: "Analysegenauigkeit",
+    overall_score: "Gesamtbewertung",
+    executive_summary: "Zusammenfassung",
+    key_points: "Hauptpunkte",
+    potential_issues: "Mögliche Probleme",
+    recommendations: "Empfehlungen",
+    send: "Senden",
+    chat_placeholder: "Stellen Sie eine Frage zum Vertrag...",
+    error_message: "Bei der Verarbeitung Ihrer Anfrage ist ein Fehler aufgetreten",
+    error_prefix: "Fehler",
+    no_response: "Keine Antwort erhalten"
+  }
+};
+
+      function updateLanguageStrings() {
+        const elements = document.querySelectorAll('[data-lang-key]');
+        elements.forEach(element => {
+          const key = element.getAttribute('data-lang-key');
+          if (translations[currentLanguage]?.[key]) {
+            if (element.tagName === 'INPUT' && element.type === 'text') {
+              element.placeholder = translations[currentLanguage][key];
+            } else {
+              element.textContent = translations[currentLanguage][key];
+            }
+          }
+        });
+      }
+
       function changeLanguage() {
         currentLanguage = document.getElementById('languageSelect').value;
         localStorage.setItem('preferredLanguage', currentLanguage);
+        updateLanguageStrings();
+        
+        // Reinitialize chat with new language if chat is active
+        if (document.getElementById('results').style.display !== 'none') {
+            initializeChat();
+        }
       }
 
       function updateProgress(step, total, message) {
@@ -748,6 +886,111 @@
             `;
       }
 
+      async function handleUpload(event) {
+        event.preventDefault();
+        
+        const fileInput = document.getElementById('contractFile');
+        if (!fileInput.files || !fileInput.files[0]) {
+            showError("No file selected", "Please select a PDF file to analyze");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', fileInput.files[0]);
+        formData.append('language', currentLanguage);
+
+        const analysisStatus = document.getElementById('analysisStatus');
+        analysisStatus.style.display = 'block';
+
+        try {
+            const response = await fetch("/analyze", {
+                method: "POST",
+                body: formData
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            
+            if (result.status === "error") {
+                showError(result.message, result.details);
+                return;
+            }
+
+            // Store analysis data for chat context
+            localStorage.setItem('analysisData', JSON.stringify(result.data));
+            
+            // Display results
+            displayResults(result.data);
+
+        } catch (error) {
+            showError("Error processing contract", error.message);
+        } finally {
+            analysisStatus.style.display = "none";
+        }
+      }
+
+      async function sendMessage() {
+        const chatInput = document.getElementById('chatInput');
+        const message = chatInput.value.trim();
+        
+        if (!message) return;
+
+        // Get stored analysis data
+        const analysisData = JSON.parse(localStorage.getItem('analysisData') || '{}');
+
+        // Display user message
+        displayChatMessage(message, true);
+        chatInput.value = '';
+
+        try {
+            const response = await fetch('/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    message: message,
+                    language: currentLanguage, // Make sure to send current language
+                    contract_text: analysisData.contract_text,
+                    shadow_analysis: analysisData.shadow_analysis,
+                    summary_analysis: analysisData.summary_analysis
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.status === 'error') {
+                const errorMessage = translations[currentLanguage]?.error_message || 'Error occurred';
+                throw new Error(errorMessage);
+            }
+
+            displayChatMessage(data.response);
+
+        } catch (error) {
+            const errorPrefix = translations[currentLanguage]?.error_prefix || 'Error';
+            displayChatMessage(`${errorPrefix}: ${error.message}`);
+        }
+      }
+
+      function showError(title, details) {
+        const errorDiv = document.getElementById('errorMessage');
+        errorDiv.innerHTML = `
+            <strong>${title}</strong>
+            ${details ? `<br>${details}` : ''}
+        `;
+        errorDiv.style.display = 'block';
+        setTimeout(() => {
+            errorDiv.style.display = 'none';
+        }, 5000);
+      }
+
       function displayResults(data) {
         document.getElementById("results").style.display = "block";
 
@@ -767,21 +1010,21 @@
       function displayContractSummary(summary) {
         document.getElementById("summaryContent").innerHTML = `
                 <div class="summary-section">
-                    <h3>Executive Summary</h3>
+                    <h3 data-lang-key="executive_summary">Executive Summary</h3>
                     <p>${summary.executive_summary}</p>
                     
                     <div class="summary-details">
-                        <h4>Key Points</h4>
+                        <h4 data-lang-key="key_points">Key Points</h4>
                         <ul class="data-list">${summary.key_points
                           .map((point) => `<li>${point}</li>`)
                           .join("")}</ul>
                         
-                        <h4>Potential Issues</h4>
+                        <h4 data-lang-key="potential_issues">Potential Issues</h4>
                         <ul class="data-list">${summary.potential_issues
                           .map((issue) => `<li>${issue}</li>`)
                           .join("")}</ul>
                         
-                        <h4>Recommendations</h4>
+                        <h4 data-lang-key="recommendations">Recommendations</h4>
                         <ul class="data-list">${summary.recommendations
                           .map((rec) => `<li>${rec}</li>`)
                           .join("")}</ul>
@@ -853,13 +1096,13 @@
         // Update Shadow Analysis score badge
         document.getElementById('shadowScore').innerHTML = `
             <div class="score-value">${Math.round(evaluation.shadow_analysis.evaluation.average)}%</div>
-            <div class="score-label">Analysis Accuracy</div>
+            <div class="score-label" data-lang-key="analysis_accuracy">Analysis Accuracy</div>
         `;
 
         // Update Summary score badge
         document.getElementById('summaryScore').innerHTML = `
             <div class="score-value">${Math.round(evaluation.summary_evaluation.average)}%</div>
-            <div class="score-label">Overall Score</div>
+            <div class="score-label" data-lang-key="overall_score">Overall Score</div>
         `;
       }
 
@@ -904,126 +1147,22 @@
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
 
-      async function handleUpload(event) {
-        event.preventDefault();
+      document.getElementById('uploadForm').addEventListener('submit', handleUpload);
 
-        const formData = new FormData();
-        const fileInput = document.getElementById('contractFile');
-        formData.append('file', fileInput.files[0]);
-        formData.append('language', currentLanguage); // Add language to request
-
-        const progressSection = document.querySelector(".progress-section");
-        progressSection.style.display = "block";
-        updateProgress(0, 5, "Starting analysis...");
-
-        try {
-          const response = await fetch("/analyze", {
-            method: "POST",
-            body: formData,
-          });
-
-          const result = await response.json();
-
-          if (result.status === "error") {
-            showError(result.message, result.details);
-            progressSection.style.display = "none";
-            return;
-          }
-
-          if (result.status === "progress") {
-            updateProgress(result.step, result.total_steps, result.message);
-            return;
-          }
-
-          if (result.status === "success") {
-            // Hide progress
-            progressSection.style.display = "none";
-
-            // Display results
-            displayResults(result.data);
-          }
-        } catch (error) {
-          showError("Error processing contract", error.message);
-          progressSection.style.display = "none";
-        }
-      }
-
-      document
-        .getElementById("uploadForm")
-        .addEventListener("submit", handleUpload);
-
-      function initializeChat() {
-        const chatInput = document.getElementById("chatInput");
-        const chatMessages = document.getElementById("chatMessages");
-
-        chatInput.addEventListener("keypress", function (e) {
-          if (e.key === "Enter") {
+      document.getElementById('chatInput').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
             sendMessage();
-          }
-        });
-      }
-
-      async function sendMessage() {
-        const chatInput = document.getElementById("chatInput");
-        const chatMessages = document.getElementById("chatMessages");
-        const message = chatInput.value.trim();
-
-        if (!message) return;
-
-        const chatData = {
-          message: message,
-          language: currentLanguage,
-        };
-
-        // Add user message
-        chatMessages.innerHTML += `
-                <div class="message user-message">
-                    <p>${message}</p>
-                </div>
-            `;
-
-        chatInput.value = "";
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        try {
-          const response = await fetch("/chat", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(chatData),
-          });
-
-          const result = await response.json();
-
-          if (result.status === "error") {
-            throw new Error(result.message);
-          }
-
-          // Add bot response
-          chatMessages.innerHTML += `
-                    <div class="message bot-message">
-                        <p>${result.response}</p>
-                    </div>
-                `;
-        } catch (error) {
-          chatMessages.innerHTML += `
-                    <div class="message bot-message error">
-                        <p>Error: ${error.message}</p>
-                    </div>
-                `;
         }
+      });
 
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      }
-
-      // Add language initialization
       document.addEventListener('DOMContentLoaded', () => {
         const savedLanguage = localStorage.getItem('preferredLanguage');
         if (savedLanguage) {
           document.getElementById('languageSelect').value = savedLanguage;
           currentLanguage = savedLanguage;
         }
+        updateLanguageStrings();
         initializeChat();
       });
     </script>
