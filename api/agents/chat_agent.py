@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import os
 from typing import Dict, Any
 
-class LegalChatAgent:
+class ChatAgent:
     def __init__(self):
         # Load environment variables
         load_dotenv()
@@ -183,7 +183,7 @@ class LegalChatAgent:
 
 # Example usage
 if __name__ == "__main__":
-    chat_agent = LegalChatAgent()
+    chat_agent = ChatAgent()
     
     # Sample data
     contract = "Sample contract text..."

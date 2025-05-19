@@ -47,7 +47,7 @@ class ContractAnalysisResult(BaseModel):
     structured_analysis: ContractAnalysis
     summary: ContractSummary
 
-class ContractAnalyzerAgent:
+class SummaryAgent:
     def __init__(self):
         load_dotenv()
         self.api_key = os.getenv("OPENROUTER_API_KEY")

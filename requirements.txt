@@ -3,7 +3,6 @@ python-dotenv
 pymupdf
 numpy
 pillow
-pytesseract
 requests
 pydantic-ai
 flask
@@ -11,3 +10,7 @@ flask-session
 werkzeug
 apscheduler
 gunicorn
+flask
+dotenv
+python-docx
+requests

@@ -1,261 +1,118 @@
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, request, jsonify, session, render_template, url_for
 from flask_session import Session
-import secrets
-from Agent.shadowAgent import ShadowAgent
-from Agent.summaryAgent import ContractAnalyzerAgent
-from Agent.ResponseEvaluatorAgent import ResponseEvaluator
-from Agent.pdfExtractor import PdfTextExtractor
-from Agent.legalChatAgent import LegalChatAgent
-from jsonHandler import add_agent_response_and_scores
-from dotenv import load_dotenv
-import json
 import os
-import time
+import secrets
+import requests
+import logging
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
-import logging
 
-# Load environment variables
-load_dotenv()
+# Import routes
+from routes.document_routes import document_bp
+from routes.shadow_routes import shadow_bp
+from routes.summary_routes import summary_bp
+from routes.evaluator_routes import evaluator_bp
+from routes.chat_routes import chat_bp
 
-app = Flask(__name__, template_folder='../templates')
+app = Flask(__name__, 
+    template_folder='../templates',
+    static_folder='../static'
+)
 
-# Session configuration
+# Add debug logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+
+# Configure app
 app.config.update(
     SECRET_KEY=os.getenv('FLASK_SECRET_KEY', secrets.token_hex(32)),
     SESSION_TYPE='filesystem',
     SESSION_FILE_DIR='flask_session',
-    PERMANENT_SESSION_LIFETIME=3600,  # 1 hour
+    PERMANENT_SESSION_LIFETIME=3600,
     SESSION_COOKIE_SECURE=True,
     SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE='Lax'
+    SESSION_COOKIE_SAMESITE='Lax',
+    MAX_CONTENT_LENGTH=16 * 1024 * 1024  # 16MB max file size
 )
 
 # Initialize Flask-Session
 Session(app)
 
-# Ensure session directory exists
-if not os.path.exists(app.config['SESSION_FILE_DIR']):
-    os.makedirs(app.config['SESSION_FILE_DIR'])
+# Register blueprints
+app.register_blueprint(document_bp, url_prefix='/api/document')
+app.register_blueprint(shadow_bp, url_prefix='/api/shadow')
+app.register_blueprint(summary_bp, url_prefix='/api/summary')
+app.register_blueprint(evaluator_bp, url_prefix='/api/evaluator')
+app.register_blueprint(chat_bp, url_prefix='/api/chat')
 
-app.config['UPLOAD_FOLDER'] = '/tmp/Uploads'
-app.config['SESSION_FILE_DIR'] = '/tmp/flask_session'
-
-if not os.path.exists(app.config['UPLOAD_FOLDER']):
-    os.makedirs(app.config['UPLOAD_FOLDER'])
-if not os.path.exists(app.config['SESSION_FILE_DIR']):
-    os.makedirs(app.config['SESSION_FILE_DIR'])
-
-
-# Initialize agents
-shadow_agent = ShadowAgent()
-summary_agent = ContractAnalyzerAgent()
-eval_agent = ResponseEvaluator()
-pdf_extractor = PdfTextExtractor()
-chat_agent = LegalChatAgent()
-
-# Configure logging
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
-
-@app.errorhandler(413)
-@app.errorhandler(RequestEntityTooLarge)
-def handle_large_file(e):
-    return jsonify({'error': 'File is too large (max 16MB)'}), 413
-
-@app.errorhandler(500)
-def handle_server_error(e):
-    return jsonify({'error': 'Internal server error occurred'}), 500
-
+# Add root route to serve the index.html template
 @app.route('/')
 def index():
+    """Serve the main application page"""
+    logger.debug(f"Template folder: {app.template_folder}")
+    logger.debug(f"Current working directory: {os.getcwd()}")
     return render_template('index.html')
 
 @app.route('/analyze', methods=['POST'])
 def analyze_contract():
+    """Main endpoint that orchestrates the analysis pipeline"""
     try:
-        # Get language preference
-        language = request.form.get('language', 'en')
-        print(f"Language selected: {language}")
+        # Get data from JSON request
+        data = request.get_json()
+        if not data or 'text' not in data:
+            return jsonify({'error': 'No text provided'}), 400
 
-        # Generate unique session ID
-        session.clear()
-        session['id'] = secrets.token_hex(16)
+        language = data.get('language', 'en')
+        contract_text = data['text']
         
-        if 'file' not in request.files:
-            return jsonify({'error': 'No file uploaded'}), 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'No file selected'}), 400
-        
-        if not file.filename.endswith('.pdf'):
-            return jsonify({'error': 'Only PDF files are allowed'}), 400
-
-        # Save and process file
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-
-        try:
-            # Step 1: Extract text
-            logger.info(f"Extracting text from PDF (language: {language})...")
-            contract_text = pdf_extractor.extract_text_from_pdf(filepath, lang=language)
-            
-            # Store session data with language
-            session['contract_text'] = contract_text
-            session['language'] = language
-            session['creation_time'] = time.time()
-
-            # Step 2: Shadow analysis with language
-            logger.info("Performing shadow analysis...")
-            shadow_analysis = shadow_agent.analyze(contract_text, language=language)
-            session['shadow_analysis'] = str(shadow_analysis)
-            
-            # Step 3: Contract analysis with language
-            logger.info("Analyzing contract structure...")
-            summary_analysis = summary_agent.analyze(contract_text, language=language)
-            session['summary_analysis'] = summary_analysis.model_dump()
-
-            # Step 4: Evaluation
-            logger.info("Evaluating analyses...")
-            shadow_eval = eval_agent.evaluate(contract_text, str(shadow_analysis), "shadow")
-            summary_eval = eval_agent.evaluate(contract_text, str(summary_analysis), "summary")
-            
-            # Step 5: Generate final report
-            logger.info("Generating final report...")
-            
-            # Extract scores and prepare response
-            shadow_scores = {
-                model: result.get('accuracy_score', 0) 
-                for model, result in shadow_eval['model_results'].items()
-                if 'accuracy_score' in result
-            }
-            
-            summary_scores = {
-                model: result.get('accuracy_score', 0) 
-                for model, result in summary_eval['model_results'].items()
-                if 'accuracy_score' in result
-            }
-
-            # Generate and modify JSON
-            json_path = summary_agent.save_analysis(summary_analysis, "Contract Analysis")
-            with open(json_path, 'r', encoding='utf-8') as f:
-                initial_json = f.read()
-            
-            final_json = add_agent_response_and_scores(
-                initial_json,
-                str(shadow_analysis),
-                shadow_scores,
-                summary_scores
-            )
-
-            return jsonify({
-                'status': 'success',
-                'data': json.loads(final_json),
-                'session_id': session['id']
-            })
-
-        except Exception as e:
-            session.clear()
-            logger.error(f"Analysis error: {str(e)}", exc_info=True)
-            return jsonify({
-                'status': 'error',
-                'message': 'Error analyzing contract',
-                'details': str(e)
-            }), 500
-
-        finally:
-            if os.path.exists(filepath):
-                os.remove(filepath)
-
-    except Exception as e:
-        session.clear()
-        logger.error(f"Request error: {str(e)}", exc_info=True)
-        return jsonify({
-            'status': 'error',
-            'message': 'Error processing request',
-            'details': str(e)
-        }), 500
-
-@app.route('/chat', methods=['POST'])
-def chat():
-    try:
-        # Validate session
-        if 'id' not in session:
-            return jsonify({'error': 'No active session'}), 401
-            
-        # Check session age
-        creation_time = session.get('creation_time', 0)
-        if time.time() - creation_time > app.config['PERMANENT_SESSION_LIFETIME']:
-            session.clear()
-            return jsonify({'error': 'Session expired'}), 401
-
-        user_message = request.json.get('message')
-        language = request.json.get('language', 'en')
-        
-        if not user_message:
-            return jsonify({'error': 'No message provided'}), 400
-
-        # Initialize chat agent with stored context and language
-        chat_agent.initialize_context(
-            session.get('contract_text'),
-            session.get('shadow_analysis'),
-            session.get('summary_analysis'),
-            language=language
+        # Step 1: Shadow analysis
+        shadow_response = requests.post(
+            f"{request.host_url}api/shadow/analyze",
+            json={'text': contract_text, 'language': language}
         )
-
-        # Get response
-        response = chat_agent.chat(user_message)
+        if shadow_response.status_code != 200:
+            return jsonify({'error': 'Shadow analysis failed'}), shadow_response.status_code
+            
+        shadow_analysis = shadow_response.json()['analysis']
         
+        # Step 2: Contract summary
+        summary_response = requests.post(
+            f"{request.host_url}api/summary/analyze",
+            json={'text': contract_text, 'language': language}
+        )
+        if summary_response.status_code != 200:
+            return jsonify({'error': 'Summary analysis failed'}), summary_response.status_code
+            
+        summary = summary_response.json()['summary']
+        
+        # Step 3: Evaluation
+        eval_response = requests.post(
+            f"{request.host_url}api/evaluator/evaluate",
+            json={
+                'text': contract_text,
+                'shadow_analysis': shadow_analysis,
+                'summary': summary,
+                'language': language
+            }
+        )
+        if eval_response.status_code != 200:
+            return jsonify({'error': 'Evaluation failed'}), eval_response.status_code
+        
+        # Return combined results
         return jsonify({
             'status': 'success',
-            'response': response,
-            'session_id': session['id']
+            'document_text': contract_text,
+            'shadow_analysis': shadow_analysis,
+            'summary': summary,
+            'evaluation': eval_response.json().get('evaluation', {})
         })
 
     except Exception as e:
-        logger.error(f"Chat error: {str(e)}", exc_info=True)
+        logger.error(f"Analysis pipeline error: {str(e)}")
         return jsonify({
             'status': 'error',
-            'message': 'Error processing chat message',
-            'details': str(e)
+            'error': str(e)
         }), 500
 
-def cleanup_old_sessions():
-    """Clean up expired session files"""
-    try:
-        session_dir = app.config['SESSION_FILE_DIR']
-        expiry = time.time() - app.config['PERMANENT_SESSION_LIFETIME']
-        
-        for file in os.listdir(session_dir):
-            if not file.endswith('.session'):
-                continue
-                
-            file_path = os.path.join(session_dir, file)
-            if os.path.getmtime(file_path) < expiry:
-                try:
-                    os.remove(file_path)
-                    logger.info(f"Removed expired session file: {file}")
-                except OSError as e:
-                    logger.error(f"Error removing session file {file}: {e}")
-    except Exception as e:
-        logger.error(f"Session cleanup error: {e}")
-
-import os
-from apscheduler.schedulers.background import BackgroundScheduler
-
 if __name__ == '__main__':
-    # Schedule session cleanup
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(cleanup_old_sessions, 'interval', hours=1)
-    scheduler.start()
-
-    try:
-        # Get port from environment variable or default to 5000 for local dev
-        port = int(os.environ.get('PORT', 5000))
-        # Run Flask app for local development, binding to 0.0.0.0
-        app.run(host='0.0.0.0', port=port, debug=True)
-    except (KeyboardInterrupt, SystemExit):
-        #scheduler.shutdown()
-        pass
+    app.run(debug=True)
