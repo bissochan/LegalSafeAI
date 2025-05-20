@@ -194,7 +194,6 @@ class SummaryAgent:
                     content = result["choices"][0]["message"]["content"]
                     if not content:
                         raise ValueError("Empty response content from API")
-                    #print("Raw API response:", content)
                     analysis_result = self._parse_response(content)
                     return analysis_result
                 else:
@@ -226,20 +225,26 @@ class SummaryAgent:
         cleaned_content = cleaned_content.strip()
 
         # Fix common JSON syntax errors
-        # 1. Add colon to END_SUMMARY if missing (e.g., "END_SUMMARY" -> "END_SUMMARY": "")
+        # 1. Add colon to END_SUMMARY if missing
         cleaned_content = re.sub(r'("END_SUMMARY")\s*([,\}])', r'\1: ""\2', cleaned_content)
-        # 2. Add colon to END_ASSESSMENT if missing (e.g., "END_ASSESSMENT" -> "END_ASSESSMENT": "")
+        # 2. Add colon to END_ASSESSMENT if missing
         cleaned_content = re.sub(r'("END_ASSESSMENT")\s*([,\}])', r'\1: ""\2', cleaned_content)
         # 3. Replace END_ASSESSMENT: null with END_ASSESSMENT: ""
         cleaned_content = re.sub(r'("END_ASSESSMENT":\s*)null', r'\1""', cleaned_content)
-        # 4. Add comma before "END_FIELD" if missing (for older responses)
+        # 4. Add comma before END_FIELD if missing
         cleaned_content = re.sub(r'("SCORE":\s*\d+)\s+("END_FIELD")', r'\1,\2', cleaned_content)
         # 5. Ensure END_FIELD is properly formatted as key-value pair
         cleaned_content = re.sub(r'("END_FIELD")\s*([,\}])', r'\1: ""\2', cleaned_content)
         # 6. Replace END_FIELD: null with END_FIELD: ""
         cleaned_content = re.sub(r'("END_FIELD":\s*)null', r'\1""', cleaned_content)
-        # 7. Add comma before END_ASSESSMENT if missing (for older responses)
+        # 7. Add comma before END_ASSESSMENT if missing
         cleaned_content = re.sub(r'("RECOMMENDATIONS":\s*".*?")\s+("END_ASSESSMENT")', r'\1,\2', cleaned_content, flags=re.DOTALL)
+        # 8. Add comma after SCORE in OVERALL_ASSESSMENT if missing
+        cleaned_content = re.sub(r'("SCORE":\s*\d+)\s+("EXECUTIVE_SUMMARY")', r'\1,\2', cleaned_content)
+        # 9. Add commas between other OVERALL_ASSESSMENT fields if missing
+        cleaned_content = re.sub(r'("EXECUTIVE_SUMMARY":\s*".*?")\s+("KEY_POINTS")', r'\1,\2', cleaned_content, flags=re.DOTALL)
+        cleaned_content = re.sub(r'("KEY_POINTS":\s*".*?")\s+("POTENTIAL_ISSUES")', r'\1,\2', cleaned_content, flags=re.DOTALL)
+        cleaned_content = re.sub(r'("POTENTIAL_ISSUES":\s*".*?")\s+("RECOMMENDATIONS")', r'\1,\2', cleaned_content, flags=re.DOTALL)
 
         # Attempt to parse the cleaned JSON
         try:

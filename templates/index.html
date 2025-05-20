@@ -31,6 +31,7 @@
                 id="languageSelect" 
                 name="language" 
                 class="language-select"
+                onchange="changeLanguage()"
             >
                 <option value="en">English</option>
                 <option value="es">Español</option>
@@ -40,7 +41,7 @@
             </select>
           </div>
           <div class="form-group">
-            <button type="submit" class="btn analyze-btn">
+            <button type="submit" class="btn analyze-btn" data-lang-key="analyze_contract">
                 Analyze Contract
             </button>
           </div>
@@ -77,13 +78,22 @@
           <div id="shadowContent" class="analysis-content"></div>
         </div>
 
-        <div class="card chat-section">
+        <div class="chat-section card">
           <h3 data-lang-key="ask_questions">Ask Questions About the Contract</h3>
           <div id="chatMessages" class="chat-messages"></div>
           <div class="chat-input-container">
-            <input type="text" id="chatInput" class="chat-input" 
-                   placeholder="Ask a question about the contract..." data-lang-key="chat_placeholder"/>
-            <button class="btn" onclick="sendMessage()" data-lang-key="send">Send</button>
+            <input type="text" 
+                   id="chatInput" 
+                   class="chat-input" 
+                   placeholder="Ask a question about the contract..."
+                   data-lang-key="chat_placeholder"
+                   disabled>
+            <button id="sendMessage" 
+                    class="btn send-btn" 
+                    data-lang-key="send"
+                    disabled>
+                Send
+            </button>
           </div>
         </div>
       </div>

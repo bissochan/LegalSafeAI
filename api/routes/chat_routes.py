@@ -27,7 +27,10 @@ def start_chat():
 
     except Exception as e:
         logger.error(f"Chat initialization error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
 
 @chat_bp.route('/message', methods=['POST'])
 def send_message():
@@ -54,7 +57,10 @@ def send_message():
 
     except Exception as e:
         logger.error(f"Message processing error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500
 
 @chat_bp.route('/end', methods=['POST'])
 def end_chat():
@@ -69,4 +75,7 @@ def end_chat():
 
     except Exception as e:
         logger.error(f"Chat end error: {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({
+            'status': 'error',
+            'error': str(e)
+        }), 500

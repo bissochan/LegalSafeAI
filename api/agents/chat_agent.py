@@ -2,7 +2,11 @@ import requests
 import json
 from dotenv import load_dotenv
 import os
+import logging
 from typing import Dict, Any
+import uuid
+
+logger = logging.getLogger(__name__)
 
 class ChatAgent:
     def __init__(self):
@@ -12,43 +16,29 @@ class ChatAgent:
         if not self.api_key:
             raise ValueError("API key not found. Please set OPENROUTER_API_KEY in your .env file.")
 
-        # Store context of the analysis
-        self.contract_text = None
-        self.shadow_analysis = None
-        self.summary_analysis = None
-        self.language = 'en'
+        # Store chat sessions
+        self.sessions: Dict[str, dict] = {}
 
-    def initialize_context(self, contract_text: str, shadow_analysis: str, 
-                            summary_analysis: Dict[str, Any], language: str = 'en'):
-        """
-        Initialize the chat context with the contract and its analyses.
+    def initialize_session(self, contract_text: str, language: str = 'en') -> str:
+        """Initialize a new chat session with contract context"""
+        session_id = str(uuid.uuid4())
+        self.sessions[session_id] = {
+            'contract_text': contract_text,
+            'language': language,
+            'messages': []
+        }
+        return session_id
+
+    def process_message(self, session_id: str, message: str, language: str = 'en') -> str:
+        """Process a chat message in the context of the contract"""
+        if session_id not in self.sessions:
+            raise ValueError("Invalid session ID")
+
+        session = self.sessions[session_id]
+        contract_text = session['contract_text']
         
-        Args:
-            contract_text (str): The original contract text
-            shadow_analysis (str): The shadow analysis results
-            summary_analysis (dict): The structured summary analysis
-            language (str): The language for responses (default is 'en')
-        """
-        self.contract_text = contract_text
-        self.shadow_analysis = shadow_analysis
-        self.summary_analysis = summary_analysis
-        self.language = language
-
-    def chat(self, user_query: str) -> str:
-        """
-        Process user queries about the contract and its analyses.
-        
-        Args:
-            user_query (str): The user's question or concern
-            
-        Returns:
-            str: The agent's response
-        """
-        if not all([self.contract_text, self.shadow_analysis, self.summary_analysis]):
-            return "Please initialize the context first with initialize_context()"
-
         system_prompt = f"""You are an expert legal assistant specialized in employment contracts.
-        Respond in {self.language}.
+        Respond in {language}.
         Your role is to help users understand the contract analysis provided and answer their questions.
         
         IMPORTANT FORMATTING RULES:
@@ -87,16 +77,10 @@ class ChatAgent:
                             "role": "user",
                             "content": f"""Context:
                             Original Contract:
-                            {self.contract_text}
-                            
-                            Shadow Analysis:
-                            {self.shadow_analysis}
-                            
-                            Structured Analysis:
-                            {json.dumps(self.summary_analysis, indent=2)}
+                            {contract_text}
                             
                             User Question:
-                            {user_query}"""
+                            {message}"""
                         }
                     ]
                 }
@@ -124,19 +108,28 @@ class ChatAgent:
         except Exception as e:
             return f"An unexpected error occurred: {str(e)}"
 
-    def get_explanation(self, aspect: str) -> str:
+    def end_session(self, session_id: str) -> None:
+        """End a chat session and cleanup"""
+        self.sessions.pop(session_id, None)
+
+    def get_explanation(self, session_id: str, aspect: str) -> str:
         """
         Get a detailed explanation of a specific aspect of the contract analysis.
         
         Args:
+            session_id (str): The ID of the chat session
             aspect (str): The aspect to explain (e.g., "sick_leave", "termination", etc.)
             
         Returns:
             str: Detailed explanation of the aspect
         """
-        if not all([self.contract_text, self.shadow_analysis, self.summary_analysis]):
-            return "Please initialize the context first with initialize_context()"
+        if session_id not in self.sessions:
+            raise ValueError("Invalid session ID")
 
+        session = self.sessions[session_id]
+        contract_text = session['contract_text']
+        language = session['language']
+        
         try:
             response = requests.post(
                 url="https://openrouter.ai/api/v1/chat/completions",
@@ -149,22 +142,18 @@ class ChatAgent:
                     "messages": [
                         {
                             "role": "system",
-                            "content": f"""Respond in {self.language}. Explain the '{aspect}' aspect of the contract in detail.
-                            Reference both the structured analysis and any relevant points from the shadow analysis.
+                            "content": f"""Respond in {language}. Explain the '{aspect}' aspect of the contract in detail.
                             Focus on:
                             1. What the contract says about this aspect
-                            2. How it was scored and why
-                            3. Any potential issues or concerns identified
-                            4. Common questions users might have about this aspect"""
+                            2. Any potential issues or concerns identified
+                            3. Common questions users might have about this aspect"""
                         },
                         {
                             "role": "user",
                             "content": f"""Based on:
-                            Contract Text: {self.contract_text}
-                            Shadow Analysis: {self.shadow_analysis}
-                            Structured Analysis: {json.dumps(self.summary_analysis.get('structured_analysis', {}).get(aspect, {}), indent=2)}
+                            Contract Text: {contract_text}
                             
-                            Please provide a detailed explanation of the '{aspect}' aspect in {self.language}."""
+                            Please provide a detailed explanation of the '{aspect}' aspect in {language}."""
                         }
                     ]
                 }
@@ -187,16 +176,18 @@ if __name__ == "__main__":
     
     # Sample data
     contract = "Sample contract text..."
-    shadow_analysis = "Sample shadow analysis..."
-    summary_analysis = {"structured_analysis": {}}
+    language = 'en'
     
     # Initialize the agent
-    chat_agent.initialize_context(contract, shadow_analysis, summary_analysis, language='en')
+    session_id = chat_agent.initialize_session(contract, language)
     
     # Example chat interaction
-    response = chat_agent.chat("Can you explain the termination clause?")
+    response = chat_agent.process_message(session_id, "Can you explain the termination clause?")
     print(response)
     
     # Example aspect explanation
-    explanation = chat_agent.get_explanation("termination")
+    explanation = chat_agent.get_explanation(session_id, "termination")
     print(explanation)
+    
+    # End the session
+    chat_agent.end_session(session_id)
