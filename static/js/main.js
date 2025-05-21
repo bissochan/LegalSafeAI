@@ -1,3 +1,4 @@
+// static/js/main.js
 let currentLanguage = 'en';
 let chatSessionId = null;
 let lastAnalysisResults = null;
@@ -29,72 +30,104 @@ function updateMarksTranslations() {
 function changeLanguage() {
     const newLanguage = document.getElementById('languageSelect').value;
     if (currentLanguage === newLanguage) return;
-    
+
+    console.log(`Changing language from ${currentLanguage} to ${newLanguage}`);
     currentLanguage = newLanguage;
     localStorage.setItem('preferredLanguage', currentLanguage);
-    
+
     updateLanguageStrings();
     updateMarksTranslations();
 
     if (lastAnalysisResults) {
+        console.log('Retranslating analysis results');
         retranslateAnalysisResults(currentLanguage);
+    } else {
+        console.log('No analysis results to retranslate, updating chat language');
+        updateChatLanguage(currentLanguage);
     }
+}
 
-    updateChatLanguage(currentLanguage);
+function disableInputsDuringRetranslation(disable) {
+    const languageSelect = document.getElementById('languageSelect');
+    const chatInput = document.getElementById('chatInput');
+    const sendButton = document.getElementById('sendMessage');
+    
+    languageSelect.disabled = disable;
+    chatInput.disabled = disable;
+    sendButton.disabled = disable;
 }
 
 async function retranslateAnalysisResults(language) {
     try {
         document.getElementById('analysisStatus').style.display = 'block';
-        updateProgress(1, 2, translations[currentLanguage]?.translating || 'Translating analysis...');
+        updateProgress(1, 2, translations[currentLanguage]?.translating || 'Translating analysis...', true);
+        disableInputsDuringRetranslation(true);
 
+        console.log(`Sending /retranslate request for ${language}`);
         const response = await fetch('/retranslate', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                language: language
-            })
+            body: JSON.stringify({ language })
         });
 
+        const data = await response.json();
+        console.log(`Retranslate response for ${language}:`, data);
+
         if (!response.ok) {
-            throw new Error(`Retranslation failed with status ${response.status}`);
+            console.error(`Retranslation failed with status ${response.status}: ${data.error}`);
+            throw new Error(data.error || `Retranslation failed: ${response.status}`);
         }
 
-        const translatedData = await response.json();
-        if (translatedData.status === 'success') {
-            lastAnalysisResults = translatedData;
-            displayAnalysisResults(translatedData);
+        if (data.status === 'success') {
+            lastAnalysisResults = data;
+            displayAnalysisResults(data);
             updateProgress(2, 2, translations[currentLanguage]?.translation_complete || 'Translation complete');
-            console.log('Retranslated results displayed:', translatedData);
+            console.log(`Successfully retranslated to ${language}`);
+            await restartChat(language);
         } else {
-            throw new Error(translatedData.error || 'Retranslation failed');
+            console.error(`Translation error for ${language}: ${data.error}`);
+            throw new Error(data.error || 'Retranslation failed');
         }
     } catch (error) {
-        console.error('Retranslation error:', error);
-        showError(`Retranslation error: ${error.message}`);
+        console.error(`Retranslation error for ${language}:`, error);
+        showError(`${translations[currentLanguage]?.retranslation_error || 'Translation error'}: ${error.message}`);
+        if (lastAnalysisResults) {
+            console.log('Falling back to last analysis results:', lastAnalysisResults);
+            displayAnalysisResults(lastAnalysisResults);
+        } else {
+            document.getElementById('results').style.display = 'none';
+        }
     } finally {
         document.getElementById('analysisStatus').style.display = 'none';
+        disableInputsDuringRetranslation(false);
+    }
+}
+
+async function restartChat(language) {
+    console.log(`Restarting chat in language: ${language}`);
+    await endChatSession();
+    if (lastAnalysisResults && lastAnalysisResults.document_text) {
+        await initializeChat(lastAnalysisResults.document_text);
+        await updateChatLanguage(language);
+    } else {
+        console.warn('No contract text available to restart chat');
     }
 }
 
 async function updateChatLanguage(language) {
-    if (!chatSessionId) return;
-
     try {
         const response = await fetch('/api/chat/update_language', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({
-                language: language
-            })
+            body: JSON.stringify({ language })
         });
 
         if (!response.ok) {
-            throw new Error(`Chat language update failed with status ${response.status}`);
+            throw new Error(`Chat language update failed: ${response.status}`);
         }
 
         const data = await response.json();
@@ -104,29 +137,26 @@ async function updateChatLanguage(language) {
         console.log(`Chat language updated to ${language}`);
     } catch (error) {
         console.error('Chat language update error:', error);
-        showError(`Chat language update error: ${error.message}`);
+        showError(`${translations[currentLanguage]?.chat_language_error || 'Chat language error'}: ${error.message}`);
     }
 }
 
 async function initializeChat(contractText) {
     const chatMessages = document.getElementById('chatMessages');
-    if (chatMessages) {
-        chatMessages.innerHTML = '';
-    }
+    if (chatMessages) chatMessages.innerHTML = '';
 
     const chatInput = document.getElementById('chatInput');
     const sendButton = document.getElementById('sendMessage');
-    if (chatInput) chatInput.disabled = true;
-    if (sendButton) sendButton.disabled = true;
-
-    await endChatSession();
+    chatInput.disabled = true;
+    sendButton.disabled = true;
 
     if (!contractText) {
-        console.log('No contract text provided for chat initialization');
+        console.warn('No contract text for chat initialization');
         return;
     }
 
     try {
+        console.log('Starting chat session');
         const response = await fetch('/api/chat/start', {
             method: 'POST',
             headers: {
@@ -139,21 +169,23 @@ async function initializeChat(contractText) {
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error(`Chat start failed: ${response.status}`);
         }
 
         const data = await response.json();
         if (data.status === 'success') {
             chatSessionId = data.session_id;
-            console.log('Chat session started with ID:', chatSessionId);
-            if (chatInput) chatInput.disabled = false;
-            if (sendButton) sendButton.disabled = false;
+            console.log('Chat session started:', chatSessionId);
+            chatInput.disabled = false;
+            sendButton.disabled = false;
         } else {
-            throw new Error(data.error || 'Failed to initialize chat');
+            throw new Error(data.error || 'Chat initialization failed');
         }
     } catch (error) {
         console.error('Chat initialization error:', error);
-        showError('Chat initialization failed: ' + error.message);
+        showError(`${translations[currentLanguage]?.chat_init_error || 'Chat initialization failed'}: ${error.message}`);
+        chatInput.disabled = true;
+        sendButton.disabled = true;
     }
 }
 
@@ -164,12 +196,14 @@ async function sendChatMessage() {
     if (!message) return;
 
     if (!chatSessionId) {
-        showError('No active chat session. Please analyze a contract first.');
+        showError(translations[currentLanguage]?.no_chat_session || 'No active chat session. Please analyze a contract.');
         return;
     }
 
     displayChatMessage(message, true);
     chatInput.value = '';
+    chatInput.disabled = true;
+    document.getElementById('sendMessage').disabled = true;
 
     try {
         const response = await fetch('/api/chat/message', {
@@ -178,13 +212,13 @@ async function sendChatMessage() {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                message: message,
+                message,
                 language: currentLanguage
             })
         });
 
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error(`Chat message failed: ${response.status}`);
         }
 
         const data = await response.json();
@@ -195,11 +229,10 @@ async function sendChatMessage() {
         }
     } catch (error) {
         console.error('Chat error:', error);
-        displayChatMessage(`Error: ${error.message}`);
-        if (error.message.includes('No active chat session')) {
-            showError('Chat session expired. Please reanalyze the contract.');
-            initializeChat();
-        }
+        displayChatMessage(`${translations[currentLanguage]?.chat_error || 'Error'}: ${error.message}`);
+    } finally {
+        chatInput.disabled = false;
+        document.getElementById('sendMessage').disabled = false;
     }
 }
 
@@ -233,7 +266,7 @@ async function endChatSession() {
 
 async function handleFileUpload(event) {
     event.preventDefault();
-    console.log('handleFileUpload triggered');
+    console.log('Handling file upload');
 
     const resultsContainer = document.getElementById('results');
     resultsContainer.style.display = 'none';
@@ -242,7 +275,7 @@ async function handleFileUpload(event) {
     const languageSelect = document.getElementById('languageSelect');
 
     if (!fileInput.files || fileInput.files.length === 0) {
-        showError(translations[currentLanguage]?.no_file_selected || 'Please select a file to analyze');
+        showError(translations[currentLanguage]?.no_file_selected || 'Please select a file.');
         return;
     }
 
@@ -251,7 +284,7 @@ async function handleFileUpload(event) {
     formData.append('language', languageSelect.value);
 
     document.getElementById('analysisStatus').style.display = 'block';
-    updateProgress(1, 4, translations[currentLanguage]?.extracting_text || 'Extracting text from document...');
+    updateProgress(1, 4, translations[currentLanguage]?.extracting_text || 'Extracting text...', true);
 
     try {
         console.log('Sending /api/document/extract request');
@@ -260,27 +293,23 @@ async function handleFileUpload(event) {
             body: formData
         });
 
-        console.log('Extract response status:', extractResponse.status);
         if (!extractResponse.ok) {
             const errorData = await extractResponse.json();
-            throw new Error(errorData.error || 'Failed to extract text');
+            throw new Error(errorData.error || 'Text extraction failed');
         }
 
         const extractData = await extractResponse.json();
-        console.log('Extracted data:', extractData);
-
         if (extractData.status !== 'success') {
             throw new Error(extractData.error || 'Text extraction failed');
         }
 
-        updateProgress(2, 4, translations[currentLanguage]?.analyzing_contract || 'Analyzing contract...');
+        updateProgress(2, 4, translations[currentLanguage]?.analyzing_contract || 'Analyzing contract...', true);
 
         console.log('Sending /analyze request');
         const analyzeResponse = await fetch('/analyze', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json'
+                'Content-Type': 'application/json'
             },
             body: JSON.stringify({
                 text: extractData.text,
@@ -288,55 +317,71 @@ async function handleFileUpload(event) {
             })
         });
 
-        console.log('Analyze response status:', analyzeResponse.status);
         if (!analyzeResponse.ok) {
             const errorData = await analyzeResponse.json();
             throw new Error(errorData.error || 'Analysis failed');
         }
 
         const analysisData = await analyzeResponse.json();
-        console.log('Analysis data:', analysisData);
+        console.log('Analysis response:', analysisData);
 
         if (analysisData.status === 'success') {
+            lastAnalysisResults = analysisData;
             updateProgress(4, 4, translations[currentLanguage]?.analysis_complete || 'Analysis complete');
             displayAnalysisResults(analysisData);
+            await initializeChat(analysisData.document_text);
         } else {
             throw new Error(analysisData.error || 'Analysis failed');
         }
 
     } catch (error) {
         console.error('File upload error:', error);
-        showError(error.message);
-        resultsContainer.style.display = 'none';
+        showError(`${translations[currentLanguage]?.error_occurred || 'Error'}: ${error.message}`);
     } finally {
         document.getElementById('analysisStatus').style.display = 'none';
     }
 }
 
-function updateProgress(step, total, message) {
+function updateProgress(step, total, message, showBlink = false) {
     const progressFill = document.querySelector('.progress-fill');
     const statusMessage = document.getElementById('statusMessage');
+    const blinkingText = document.getElementById('blinkingText');
     progressFill.style.width = `${(step / total) * 100}%`;
     statusMessage.textContent = message;
+    if (showBlink) {
+        if (!blinkingText) {
+            const blinkDiv = document.createElement('div');
+            blinkDiv.id = 'blinkingText';
+            blinkDiv.className = 'blinking-text';
+            blinkDiv.textContent = translations[currentLanguage]?.performing_analysis || 'Processing...';
+            statusMessage.insertAdjacentElement('afterend', blinkDiv);
+        } else {
+            blinkingText.textContent = translations[currentLanguage]?.performing_analysis || 'Processing...';
+        }
+    } else if (blinkingText) {
+        blinkingText.remove();
+    }
 }
 
 function showError(message) {
     const errorDiv = document.getElementById('errorMessage');
     errorDiv.textContent = message;
     errorDiv.style.display = 'block';
-
     setTimeout(() => {
         errorDiv.style.display = 'none';
     }, 5000);
 }
 
 function displayAnalysisResults(data) {
-    if (data.status !== 'success') {
-        showError(translations[currentLanguage]?.error_occurred || 'Failed to process analysis results');
+    console.log('Displaying analysis results:', data);
+
+    if (!data || data.status !== 'success') {
+        console.error('Invalid analysis data:', data);
+        showError(translations[currentLanguage]?.error_occurred || 'Failed to display results.');
+        document.getElementById('results').style.display = 'none';
         return;
     }
 
-    console.log('Displaying analysis results:', data);
     lastAnalysisResults = data;
 
     localStorage.setItem('analysisData', JSON.stringify({
@@ -345,27 +390,32 @@ function displayAnalysisResults(data) {
         summary_analysis: data.summary
     }));
 
-    initializeChat(data.document_text);
+    // Reset UI
+    document.getElementById('summaryContent').innerHTML = '';
+    document.getElementById('scoresGrid').innerHTML = '';
+    document.getElementById('shadowContent').innerHTML = '';
 
+    // Display contract text
     document.getElementById('summaryContent').innerHTML = `
         <div class="summary-section">
-            <h3 data-lang-key="contract_text">Contract Text</h3>
-            <pre class="contract-text">${data.document_text.replace(/\n/g, '<br>')}</pre>
+            <h3 data-lang-key="contract_text">${translations[currentLanguage]?.contract_text || 'Contract Text'}</h3>
+            <pre class="contract-text">${(data.document_text || '').replace(/\n/g, '<br>')}</pre>
         </div>
     `;
 
-    displayContractSummary(data.summary?.summary || {});
+    displayContractSummary(data.summary || {});
     displayScoresGrid(data.summary?.structured_analysis || {});
-    displayShadowAnalysis({ content: data.shadow_analysis });
+    displayShadowAnalysis({ content: data.shadow_analysis || '' });
     updateScoreBadges(data.evaluation || {});
     updateLanguageStrings();
     updateMarksTranslations();
 
     document.getElementById('results').style.display = 'block';
+    console.log('Results displayed successfully');
 }
 
 function displayContractSummary(summary) {
-    console.log('Displaying contract summary:', summary);
+    console.log('Displaying summary:', summary);
 
     const keyPoints = typeof summary.key_points === 'string' && summary.key_points.trim()
         ? summary.key_points.split('\n').filter(p => p.trim())
@@ -410,14 +460,10 @@ function displayScoresGrid(analysis) {
                     <div class="score-header">
                         <h4 data-mark-key="${key}">${translatedTitle}</h4>
                         <div class="score-info">
-                            <span class="score-badge">${value.score}/10</span>
+                            <span class="score-badge">${value.score || 0}/10</span>
                         </div>
                     </div>
-                    ${value.content ? `
-                        <div class="score-content">
-                            <p>${value.content}</p>
-                        </div>
-                    ` : ''}
+                    ${value.content ? `<div class="score-content"><p>${value.content}</p></div>` : ''}
                 </div>
             `;
         })
@@ -431,7 +477,7 @@ function displayShadowAnalysis(shadowData) {
     shadowContent.innerHTML = `
         <div class="shadow-section">
             <div class="shadow-text">
-                ${formatShadowContent(shadowData.content)}
+                ${formatShadowContent(shadowData.content || '')}
             </div>
         </div>
     `;
@@ -465,7 +511,7 @@ function updateScoreBadges(evaluation) {
 }
 
 function getScoreClass(score) {
-    if (score <= 3) return "low-score";
+    if (!score || score <= 3) return "low-score";
     if (score >= 8) return "high-score";
     return "";
 }
@@ -475,12 +521,12 @@ function formatTitle(key) {
 }
 
 function displayChatMessage(message, isUser = false) {
-    const chatMessages = document.getElementById("chatMessages");
-    const messageDiv = document.createElement("div");
-    messageDiv.className = `chat-message ${isUser ? "user-message" : "bot-message"}`;
+    const chatMessages = document.getElementById('chatMessages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${isUser ? 'user-message' : 'bot-message'}`;
 
     const formattedMessage = message
-        .split("\n\n")
+        .split('\n\n')
         .map(para => {
             if (para.includes('\n- ')) {
                 const items = para.split('\n- ').filter(item => item.trim());
@@ -492,7 +538,7 @@ function displayChatMessage(message, isUser = false) {
             }
             return `<p>${para.trim()}</p>`;
         })
-        .join("");
+        .join('');
 
     messageDiv.innerHTML = formattedMessage;
     chatMessages.appendChild(messageDiv);
@@ -527,7 +573,6 @@ async function handleStudentSearch(event) {
     const university = document.getElementById('universityInput').value;
     const category = document.getElementById('categorySelect').value;
     const customKeywords = document.getElementById('customKeywords').value;
-    const searchResults = document.getElementById('searchResults');
     
     try {
         const response = await fetch('/api/student/search', {
@@ -536,8 +581,8 @@ async function handleStudentSearch(event) {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                university: university,
-                category: category,
+                university,
+                category,
                 keywords: category === 'custom' ? customKeywords.split(',').map(k => k.trim()) : undefined,
                 language: currentLanguage
             })
@@ -549,9 +594,8 @@ async function handleStudentSearch(event) {
 
         const data = await response.json();
         displayStudentResults(data);
-        
     } catch (error) {
-        showError(translations[currentLanguage]?.error_occurred || 'Search failed: ' + error.message);
+        showError(`${translations[currentLanguage]?.error_occurred || 'Search failed'}: ${error.message}`);
     }
 }
 
@@ -568,7 +612,6 @@ function displayStudentResults(data) {
                 <p data-lang-key="results_for">Results for ${data.university}</p>
                 <p data-lang-key="found_results">Found ${data.summary.total_results} relevant results</p>
             </div>
-            
             ${data.results.map(result => `
                 <div class="search-result">
                     <h4 class="result-title">
@@ -577,9 +620,7 @@ function displayStudentResults(data) {
                     <p class="result-summary">${result.content_summary}</p>
                     <div class="result-meta">
                         <div class="keywords">
-                            ${result.matched_keywords.map(kw => 
-                                `<span class="keyword-tag">${kw}</span>`
-                            ).join('')}
+                            ${result.matched_keywords.map(kw => `<span class="keyword-tag">${kw}</span>`).join('')}
                         </div>
                         <div class="relevance">
                             <span class="relevance-score">
@@ -604,14 +645,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (form) {
             form.addEventListener('submit', handleFileUpload);
             console.log('Form submit handler attached');
-        } else {
-            console.error('Upload form not found!');
         }
 
         const chatInput = document.getElementById('chatInput');
         const sendButton = document.getElementById('sendMessage');
         if (chatInput) {
-            chatInput.addEventListener('keypress', function(e) {
+            chatInput.addEventListener('keypress', e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     sendChatMessage();
@@ -625,17 +664,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const contractBtn = document.getElementById('contractModeBtn');
         const studentBtn = document.getElementById('studentModeBtn');
         if (contractBtn && studentBtn) {
-            contractBtn.addEventListener('click', () => {
-                console.log('Contract mode button clicked');
-                switchMode('contract');
-            });
-            studentBtn.addEventListener('click', () => {
-                console.log('Student mode button clicked');
-                switchMode('student');
-            });
-            console.log('Mode toggle handlers attached');
-        } else {
-            console.error('Mode toggle buttons not found!');
+            contractBtn.addEventListener('click', () => switchMode('contract'));
+            studentBtn.addEventListener('click', () => switchMode('student'));
         }
 
         const savedMode = localStorage.getItem('currentMode') || 'contract';
@@ -645,12 +675,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (savedLanguage) {
             currentLanguage = savedLanguage;
             document.getElementById('languageSelect').value = savedLanguage;
+            updateLanguageStrings();
+            updateMarksTranslations();
         }
-
-        updateLanguageStrings();
-        updateMarksTranslations();
-
-        initializeChat();
 
         const categorySelect = document.getElementById('categorySelect');
         if (categorySelect) {
@@ -663,9 +690,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const studentForm = document.getElementById('studentSearchForm');
         if (studentForm) {
             studentForm.addEventListener('submit', handleStudentSearch);
-            console.log('Student search form handler attached');
-        } else {
-            console.error('Student search form not found!');
+        }
+
+        const languageSelect = document.getElementById('languageSelect');
+        if (languageSelect) {
+            languageSelect.addEventListener('change', changeLanguage);
         }
 
         window.addEventListener('beforeunload', endChatSession);

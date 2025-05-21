@@ -5,6 +5,7 @@ import os
 import logging
 from typing import Dict, Any
 import uuid
+from agents.translator_agent import TranslatorAgent
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,9 @@ class ChatAgent:
         if not self.api_key:
             raise ValueError("API key not found. Please set OPENROUTER_API_KEY in your .env file.")
 
+        # Initialize translator
+        self.translator = TranslatorAgent()
+        
         # Store chat sessions
         self.sessions: Dict[str, dict] = {}
 
@@ -27,7 +31,15 @@ class ChatAgent:
             'language': language,
             'messages': []
         }
+        logger.debug(f"Initialized chat session {session_id} with language {language}")
         return session_id
+
+    def update_session_language(self, session_id: str, language: str) -> None:
+        """Update the language of an existing chat session"""
+        if session_id not in self.sessions:
+            raise ValueError("Invalid session ID")
+        self.sessions[session_id]['language'] = language
+        logger.debug(f"Updated chat session {session_id} to language {language}")
 
     def process_message(self, session_id: str, message: str, language: str = 'en') -> str:
         """Process a chat message in the context of the contract"""
@@ -36,9 +48,21 @@ class ChatAgent:
 
         session = self.sessions[session_id]
         contract_text = session['contract_text']
+        session_language = session.get('language', language)
         
+        # Translate user message to English if not in English
+        if session_language != 'en':
+            translation_response = self.translator.translate(
+                content={'message': message},
+                target_language='en'
+            )
+            if translation_response['status'] == 'success':
+                message = translation_response['translated_content']['message']
+            else:
+                logger.error(f"Failed to translate message to English: {translation_response.get('error')}")
+                return "Sorry, I couldn't process your message due to a translation error."
+
         system_prompt = f"""You are an expert legal assistant specialized in employment contracts.
-        Respond in {language}.
         Your role is to help users understand the contract analysis provided and answer their questions.
         
         IMPORTANT FORMATTING RULES:
@@ -82,7 +106,8 @@ class ChatAgent:
                             User Question:
                             {message}"""
                         }
-                    ]
+                    ],
+                    "max_tokens": 2000
                 }
             )
             
@@ -90,39 +115,48 @@ class ChatAgent:
             result = response.json()
             
             if "choices" in result and len(result["choices"]) > 0:
-                # Clean up any remaining markdown or special characters
                 answer = result["choices"][0]["message"]["content"]
-                answer = answer.replace("**", "")
-                answer = answer.replace("*", "")
-                answer = answer.replace("`", "")
-                answer = answer.replace("#", "")
-                answer = answer.replace(">", "")
+                # Clean up any remaining markdown or special characters
+                answer = answer.replace("**", "").replace("*", "").replace("`", "").replace("#", "").replace(">", "")
+                
+                # Translate response back to session language if not English
+                if session_language != 'en':
+                    translation_response = self.translator.translate(
+                        content={'answer': answer},
+                        target_language=session_language
+                    )
+                    if translation_response['status'] == 'success':
+                        answer = translation_response['translated_content']['answer']
+                    else:
+                        logger.error(f"Failed to translate response to {session_language}: {translation_response.get('error')}")
+                        return "Sorry, I couldn't process the response due to a translation error."
+                
+                # Store message history
+                session['messages'].append({
+                    'user': message,
+                    'assistant': answer
+                })
                 return answer
             else:
                 return "I couldn't generate a response. Please try rephrasing your question."
                 
         except requests.exceptions.RequestException as e:
+            logger.error(f"API request failed: {str(e)}")
             return f"Error communicating with the API: {str(e)}"
         except json.JSONDecodeError:
+            logger.error("Invalid JSON response from API")
             return "Error processing the response from the API"
         except Exception as e:
+            logger.error(f"Unexpected error: {str(e)}")
             return f"An unexpected error occurred: {str(e)}"
 
     def end_session(self, session_id: str) -> None:
         """End a chat session and cleanup"""
         self.sessions.pop(session_id, None)
+        logger.debug(f"Ended chat session {session_id}")
 
     def get_explanation(self, session_id: str, aspect: str) -> str:
-        """
-        Get a detailed explanation of a specific aspect of the contract analysis.
-        
-        Args:
-            session_id (str): The ID of the chat session
-            aspect (str): The aspect to explain (e.g., "sick_leave", "termination", etc.)
-            
-        Returns:
-            str: Detailed explanation of the aspect
-        """
+        """Get a detailed explanation of a specific aspect of the contract analysis"""
         if session_id not in self.sessions:
             raise ValueError("Invalid session ID")
 
@@ -142,20 +176,32 @@ class ChatAgent:
                     "messages": [
                         {
                             "role": "system",
-                            "content": f"""Respond in {language}. Explain the '{aspect}' aspect of the contract in detail.
+                            "content": f"""You are an expert legal assistant specialized in employment contracts.
+                            Respond in {language}.
+                            Explain the '{aspect}' aspect of the contract in detail.
+                            
+                            IMPORTANT FORMATTING RULES:
+                            1. Use plain text only - no Markdown, no asterisks, no special formatting
+                            2. Use simple punctuation and natural language
+                            3. Structure your response like a chat message
+                            4. Use clear paragraphs with line breaks for readability
+                            5. Use simple bullet points with dashes (-)
+                            6. Avoid technical formatting or symbols
+                            
                             Focus on:
-                            1. What the contract says about this aspect
-                            2. Any potential issues or concerns identified
-                            3. Common questions users might have about this aspect"""
+                            - What the contract says about this aspect
+                            - Any potential issues or concerns identified
+                            - Common questions users might have about this aspect"""
                         },
                         {
                             "role": "user",
                             "content": f"""Based on:
                             Contract Text: {contract_text}
                             
-                            Please provide a detailed explanation of the '{aspect}' aspect in {language}."""
+                            Please provide a detailed explanation of the '{aspect}' aspect."""
                         }
-                    ]
+                    ],
+                    "max_tokens": 2000
                 }
             )
             
@@ -163,31 +209,24 @@ class ChatAgent:
             result = response.json()
             
             if "choices" in result and len(result["choices"]) > 0:
-                return result["choices"][0]["message"]["content"]
+                answer = result["choices"][0]["message"]["content"]
+                # Clean up any remaining markdown or special characters
+                answer = answer.replace("**", "").replace("*", "").replace("`", "").replace("#", "").replace(">", "")
+                return answer
             else:
                 return f"I couldn't generate an explanation for the {aspect} aspect."
                 
         except Exception as e:
+            logger.error(f"Error generating explanation for {aspect}: {str(e)}")
             return f"Error generating explanation: {str(e)}"
 
-# Example usage
 if __name__ == "__main__":
     chat_agent = ChatAgent()
-    
-    # Sample data
     contract = "Sample contract text..."
     language = 'en'
-    
-    # Initialize the agent
     session_id = chat_agent.initialize_session(contract, language)
-    
-    # Example chat interaction
     response = chat_agent.process_message(session_id, "Can you explain the termination clause?")
     print(response)
-    
-    # Example aspect explanation
     explanation = chat_agent.get_explanation(session_id, "termination")
     print(explanation)
-    
-    # End the session
     chat_agent.end_session(session_id)
