@@ -7,22 +7,25 @@ import logging
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 
-# Import routes
+# Import routes from routes/
 from routes.document_routes import document_bp
 from routes.shadow_routes import shadow_bp
 from routes.summary_routes import summary_bp
 from routes.evaluator_routes import evaluator_bp
 from routes.chat_routes import chat_bp
 from routes.translator_routes import translator_bp
+from routes.student_routes import student_bp
+from routes.web_search_routes import web_search_bp
 
-app = Flask(__name__, 
-    template_folder='../templates',
-    static_folder='../static'
-)
-
-# Add debug logging
+# Configure logging
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
+
+
+app = Flask(__name__, 
+    template_folder="../templates",
+    static_folder="../static",
+)
 
 # Configure app
 app.config.update(
@@ -46,19 +49,23 @@ app.register_blueprint(summary_bp, url_prefix='/api/summary')
 app.register_blueprint(evaluator_bp, url_prefix='/api/evaluator')
 app.register_blueprint(chat_bp, url_prefix='/api/chat')
 app.register_blueprint(translator_bp, url_prefix='/api/translator')
+app.register_blueprint(student_bp, url_prefix='/api/student')
+app.register_blueprint(web_search_bp, url_prefix='/api/web_search')
 
 @app.route('/')
 def index():
     """Serve the main application page"""
-    logger.debug(f"Template folder: {app.template_folder}")
-    logger.debug(f"Current working directory: {os.getcwd()}")
-    return render_template('index.html')
+    logger.debug("Attempting to render index.html")
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        logger.error(f"Error rendering index.html: {str(e)}")
+        raise
 
 @app.route('/analyze', methods=['POST'])
 def analyze_contract():
     """Main endpoint that orchestrates the analysis pipeline"""
     try:
-        # Get data from JSON request
         data = request.get_json()
         if not data or 'text' not in data:
             logger.error("No text provided in analyze request")
@@ -67,7 +74,6 @@ def analyze_contract():
         user_language = data.get('language', 'en')
         contract_text = data['text']
         
-        # Always analyze in English first
         logger.debug("Starting shadow analysis")
         shadow_response = requests.post(
             f"{request.host_url}api/shadow/analyze",
@@ -104,7 +110,6 @@ def analyze_contract():
             logger.error(f"Evaluation failed with status {eval_response.status_code}")
             return jsonify({'error': 'Evaluation failed'}), eval_response.status_code
         
-        # Compile English results
         analysis_results = {
             'status': 'success',
             'document_text': contract_text,
@@ -114,13 +119,11 @@ def analyze_contract():
             'original_language': 'en'
         }
 
-        # Store English results and language in session
         session['english_analysis_results'] = analysis_results
         session['contract_text'] = contract_text
-        session['chat_language'] = user_language  # Store initial chat language
+        session['chat_language'] = user_language
         logger.debug(f"Stored English analysis results and chat language ({user_language}) in session")
 
-        # Translate if user requested different language
         if user_language != 'en':
             logger.debug(f"Translating analysis results to {user_language}")
             translation_response = requests.post(

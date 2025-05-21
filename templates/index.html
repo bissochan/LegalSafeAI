@@ -9,93 +9,136 @@
   <body>
     <div class="container">
       <div class="header">
-        <h1>LegalSafeAI Contract Analyzer</h1>
+        <h1>LegalSafeAI</h1>
+        <div class="mode-toggle">
+            <button id="contractModeBtn" class="mode-btn active" data-lang-key="contract_mode">Contract Analysis</button>
+            <button id="studentModeBtn" class="mode-btn" data-lang-key="student_mode">Student Search</button>
+        </div>
+        <select id="languageSelect" class="language-select" onchange="changeLanguage()">
+            <option value="en">English</option>
+            <option value="es">Español</option>
+            <option value="fr">Français</option>
+            <option value="it">Italiano</option>
+            <option value="de">Deutsch</option>
+        </select>
       </div>
 
       <div id="errorMessage" class="error-message"></div>
 
-      <div class="card">
-        <form id="uploadForm" class="upload-section" enctype="multipart/form-data">
-          <div class="form-group">
-            <input 
-                type="file" 
-                class="file-input" 
-                id="contractFile" 
-                name="file"
-                accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
-                required
-            />
-          </div>
-          <div class="form-group">
-            <select 
-                id="languageSelect" 
-                name="language" 
-                class="language-select"
-                onchange="changeLanguage()"
-            >
-                <option value="en">English</option>
-                <option value="es">Español</option>
-                <option value="fr">Français</option>
-                <option value="it">Italiano</option>
-                <option value="de">Deutsch</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <button type="submit" class="btn analyze-btn" data-lang-key="analyze_contract">
-                Analyze Contract
-            </button>
-          </div>
-          <div id="analysisStatus" class="analysis-status" style="display: none;">
-            <div class="progress-section">
-              <div class="progress-bar">
-                <div class="progress-fill"></div>
+      <div id="contractSection">
+        <div class="card">
+          <form id="uploadForm" class="upload-section" enctype="multipart/form-data">
+            <div class="form-group">
+              <input 
+                  type="file" 
+                  class="file-input" 
+                  id="contractFile" 
+                  name="file"
+                  accept=".pdf,.doc,.docx,.txt,.jpg,.jpeg,.png"
+                  required
+              />
+            </div>
+            <div class="form-group">
+              <button type="submit" class="btn analyze-btn" data-lang-key="analyze_contract">
+                  Analyze Contract
+              </button>
+            </div>
+            <div id="analysisStatus" class="analysis-status" style="display: none;">
+              <div class="progress-section">
+                <div class="progress-bar">
+                  <div class="progress-fill"></div>
+                </div>
+                <div id="statusMessage"></div>
               </div>
-              <div id="statusMessage"></div>
+            </div>
+          </form>
+        </div>
+
+        <div id="results" style="display: none">
+          <div class="card analysis-section">
+            <div class="section-header">
+              <h2 data-lang-key="contract_analysis">Contract Analysis</h2>
+              <div class="score-badge" id="summaryScore"></div>
+            </div>
+            <div id="summaryContent" class="analysis-content"></div>
+          </div>
+
+          <div class="card scores-section">
+            <h3 data-lang-key="section_scores">Contract Section Scores</h3>
+            <div id="scoresGrid" class="scores-grid"></div>
+          </div>
+
+          <div class="card analysis-section">
+            <div class="section-header">
+              <h2 data-lang-key="shadow_analysis">Shadow Analysis</h2>
+              <div class="score-badge" id="shadowScore"></div>
+            </div>
+            <div id="shadowContent" class="analysis-content"></div>
+          </div>
+
+          <div class="evaluation-section">
+            <h3 data-lang-key="evaluation">Evaluation</h3>
+            <div class="marks-container">
+                <!-- Marks will be populated by JavaScript with data-mark-key attributes -->
             </div>
           </div>
-        </form>
+
+          <div class="chat-section card">
+            <h3 data-lang-key="ask_questions">Ask Questions About the Contract</h3>
+            <div id="chatMessages" class="chat-messages"></div>
+            <div class="chat-input-container">
+              <input type="text" 
+                     id="chatInput" 
+                     class="chat-input" 
+                     placeholder="Ask a question about the contract..."
+                     data-lang-key="chat_placeholder"
+                     disabled>
+              <button id="sendMessage" 
+                      class="btn send-btn" 
+                      data-lang-key="send"
+                      disabled>
+                  Send
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div id="results" style="display: none">
-        <div class="card analysis-section">
-          <div class="section-header">
-            <h2 data-lang-key="contract_analysis">Contract Analysis</h2>
-            <div class="score-badge" id="summaryScore"></div>
-          </div>
-          <div id="summaryContent" class="analysis-content"></div>
+      <div id="studentSection" class="section" style="display: none;">
+        <div class="card">
+            <h2 data-lang-key="student_search">Student Information Search</h2>
+            <form id="studentSearchForm" class="search-section">
+                <div class="form-group">
+                    <label for="universityInput" data-lang-key="university_name">University Name</label>
+                    <input type="text" 
+                           id="universityInput" 
+                           class="form-input" 
+                           required>
+                </div>
+                <div class="form-group">
+                    <label for="categorySelect" data-lang-key="search_category">Category</label>
+                    <select id="categorySelect" class="form-select">
+                        <option value="working_student" data-lang-key="category_working">Working Student Regulations</option>
+                        <option value="housing" data-lang-key="category_housing">Student Housing</option>
+                        <option value="research" data-lang-key="category_research">Research Opportunities</option>
+                        <option value="internship" data-lang-key="category_internship">Internships</option>
+                        <option value="job_offers" data-lang-key="category_jobs">Job Offers</option>
+                        <option value="custom" data-lang-key="category_custom">Custom Search</option>
+                    </select>
+                </div>
+                <div id="customKeywordsContainer" class="form-group" style="display: none;">
+                    <label for="customKeywords" data-lang-key="custom_keywords">Custom Keywords</label>
+                    <input type="text" 
+                           id="customKeywords" 
+                           class="form-input" 
+                           data-lang-key="keywords_placeholder"
+                           placeholder="Enter keywords (comma-separated)">
+                </div>
+                <button type="submit" class="btn search-btn" data-lang-key="search">Search</button>
+            </form>
         </div>
 
-        <div class="card scores-section">
-          <h3 data-lang-key="section_scores">Contract Section Scores</h3>
-          <div id="scoresGrid" class="scores-grid"></div>
-        </div>
-
-        <div class="card analysis-section">
-          <div class="section-header">
-            <h2 data-lang-key="shadow_analysis">Shadow Analysis</h2>
-            <div class="score-badge" id="shadowScore"></div>
-          </div>
-          <div id="shadowContent" class="analysis-content"></div>
-        </div>
-
-        <div class="chat-section card">
-          <h3 data-lang-key="ask_questions">Ask Questions About the Contract</h3>
-          <div id="chatMessages" class="chat-messages"></div>
-          <div class="chat-input-container">
-            <input type="text" 
-                   id="chatInput" 
-                   class="chat-input" 
-                   placeholder="Ask a question about the contract..."
-                   data-lang-key="chat_placeholder"
-                   disabled>
-            <button id="sendMessage" 
-                    class="btn send-btn" 
-                    data-lang-key="send"
-                    disabled>
-                Send
-            </button>
-          </div>
-        </div>
+        <div id="searchResults" class="results-container" style="display: none;"></div>
       </div>
     </div>
 
