@@ -3,14 +3,18 @@ let currentLanguage = 'en';
 let chatSessionId = null;
 let lastAnalysisResults = null;
 let currentMode = 'contract';
+let searchTimeout = null;
 
 function updateLanguageStrings() {
     const elements = document.querySelectorAll('[data-lang-key]');
     elements.forEach(element => {
         const key = element.getAttribute('data-lang-key');
         if (translations[currentLanguage]?.[key]) {
-            if (element.tagName === 'INPUT' && element.type === 'text') {
+            if (element.tagName === 'TEXTAREA' || (element.tagName === 'INPUT' && element.type === 'text')) {
                 element.placeholder = translations[currentLanguage][key];
+            } else if (element.tagName === 'LABEL' && element.classList.contains('chip')) {
+                element.textContent = translations[currentLanguage][key];
+                element.setAttribute('title', translations[currentLanguage][key + '_desc'] || translations[currentLanguage][key]);
             } else {
                 element.textContent = translations[currentLanguage][key];
             }
@@ -202,8 +206,11 @@ async function sendChatMessage() {
 
     displayChatMessage(message, true);
     chatInput.value = '';
-    chatInput.disabled = true;
+    chatInput.style.height = 'auto';
     document.getElementById('sendMessage').disabled = true;
+    chatInput.disabled = true;
+
+    displayTypingIndicator();
 
     try {
         const response = await fetch('/api/chat/message', {
@@ -223,12 +230,14 @@ async function sendChatMessage() {
 
         const data = await response.json();
         if (data.status === 'success') {
+            removeTypingIndicator();
             displayChatMessage(data.response);
         } else {
             throw new Error(data.error || 'Failed to process message');
         }
     } catch (error) {
         console.error('Chat error:', error);
+        removeTypingIndicator();
         displayChatMessage(`${translations[currentLanguage]?.chat_error || 'Error'}: ${error.message}`);
     } finally {
         chatInput.disabled = false;
@@ -328,12 +337,14 @@ async function handleFileUpload(event) {
         if (analysisData.status === 'success') {
             lastAnalysisResults = analysisData;
             updateProgress(4, 4, translations[currentLanguage]?.analysis_complete || 'Analysis complete');
+            console.log('Calling displayAnalysisResults with data:', analysisData);
             displayAnalysisResults(analysisData);
             await initializeChat(analysisData.document_text);
+            console.log('Forcing results visibility');
+            resultsContainer.style.display = 'block';
         } else {
             throw new Error(analysisData.error || 'Analysis failed');
         }
-
     } catch (error) {
         console.error('File upload error:', error);
         showError(`${translations[currentLanguage]?.error_occurred || 'Error'}: ${error.message}`);
@@ -363,9 +374,10 @@ function updateProgress(step, total, message, showBlink = false) {
     }
 }
 
-function showError(message) {
+function showError(message, isSuccess = false) {
     const errorDiv = document.getElementById('errorMessage');
     errorDiv.textContent = message;
+    errorDiv.className = `error-message ${isSuccess ? 'success-message' : ''}`;
     errorDiv.style.display = 'block';
     setTimeout(() => {
         errorDiv.style.display = 'none';
@@ -373,7 +385,7 @@ function showError(message) {
 }
 
 function displayAnalysisResults(data) {
-    console.log('Displaying analysis results:', data);
+    console.log('Received analysis data:', JSON.stringify(data, null, 2));
 
     if (!data || data.status !== 'success') {
         console.error('Invalid analysis data:', data);
@@ -390,12 +402,12 @@ function displayAnalysisResults(data) {
         summary_analysis: data.summary
     }));
 
-    // Reset UI
+    console.log('Clearing DOM elements');
     document.getElementById('summaryContent').innerHTML = '';
     document.getElementById('scoresGrid').innerHTML = '';
     document.getElementById('shadowContent').innerHTML = '';
 
-    // Display contract text
+    console.log('Rendering contract text');
     document.getElementById('summaryContent').innerHTML = `
         <div class="summary-section">
             <h3 data-lang-key="contract_text">${translations[currentLanguage]?.contract_text || 'Contract Text'}</h3>
@@ -403,13 +415,18 @@ function displayAnalysisResults(data) {
         </div>
     `;
 
+    console.log('Displaying contract summary:', data.summary);
     displayContractSummary(data.summary || {});
+    console.log('Displaying scores grid:', data.summary?.structured_analysis);
     displayScoresGrid(data.summary?.structured_analysis || {});
+    console.log('Displaying shadow analysis:', data.shadow_analysis);
     displayShadowAnalysis({ content: data.shadow_analysis || '' });
+    console.log('Updating score badges:', data.evaluation);
     updateScoreBadges(data.evaluation || {});
     updateLanguageStrings();
     updateMarksTranslations();
 
+    console.log('Setting results display to block');
     document.getElementById('results').style.display = 'block';
     console.log('Results displayed successfully');
 }
@@ -417,13 +434,13 @@ function displayAnalysisResults(data) {
 function displayContractSummary(summary) {
     console.log('Displaying summary:', summary);
 
-    const keyPoints = typeof summary.key_points === 'string' && summary.key_points.trim()
+    const keyPoints = typeof summary?.key_points === 'string' && summary.key_points.trim()
         ? summary.key_points.split('\n').filter(p => p.trim())
         : [];
-    const potentialIssues = typeof summary.potential_issues === 'string' && summary.potential_issues.trim()
+    const potentialIssues = typeof summary?.potential_issues === 'string' && summary.potential_issues.trim()
         ? summary.potential_issues.split('\n').filter(p => p.trim())
         : [];
-    const recommendations = typeof summary.recommendations === 'string' && summary.recommendations.trim()
+    const recommendations = typeof summary?.recommendations === 'string' && summary.recommendations.trim()
         ? summary.recommendations.split('\n').filter(p => p.trim())
         : [];
 
@@ -431,7 +448,7 @@ function displayContractSummary(summary) {
     summaryContent.innerHTML += `
         <div class="summary-section">
             <h3 data-lang-key="executive_summary">${translations[currentLanguage]?.executive_summary || 'Executive Summary'}</h3>
-            <p>${summary.executive_summary || translations[currentLanguage]?.no_summary || 'No summary available'}</p>
+            <p>${summary?.executive_summary || translations[currentLanguage]?.no_summary || 'No summary available'}</p>
             <div class="summary-details">
                 <h4 data-lang-key="key_points">${translations[currentLanguage]?.key_points || 'Key Points'}</h4>
                 <ul class="data-list">
@@ -451,19 +468,21 @@ function displayContractSummary(summary) {
 }
 
 function displayScoresGrid(analysis) {
-    const scoresHtml = Object.entries(analysis)
+    console.log('Rendering scores grid with analysis:', analysis);
+
+    const scoresHtml = Object.entries(analysis || {})
         .filter(([key]) => key !== 'overall_score')
         .map(([key, value]) => {
             const translatedTitle = translations[currentLanguage]?.marks?.[key] || formatTitle(key);
             return `
-                <div class="score-card ${getScoreClass(value.score)}">
+                <div class="score-card ${getScoreClass(value?.score)}">
                     <div class="score-header">
                         <h4 data-mark-key="${key}">${translatedTitle}</h4>
                         <div class="score-info">
-                            <span class="score-badge">${value.score || 0}/10</span>
+                            <span class="score-badge">${value?.score || 0}/10</span>
                         </div>
                     </div>
-                    ${value.content ? `<div class="score-content"><p>${value.content}</p></div>` : ''}
+                    ${value?.content ? `<div class="score-content"><p>${value.content}</p></div>` : ''}
                 </div>
             `;
         })
@@ -499,7 +518,7 @@ function formatShadowContent(content) {
 }
 
 function updateScoreBadges(evaluation) {
-    const overallScore = evaluation.evaluation?.overall_score * 10 || 0;
+    const overallScore = (evaluation?.evaluation?.overall_score || 0) * 10;
     document.getElementById('summaryScore').innerHTML = `
         <div class="score-value">${Math.round(overallScore)}%</div>
         <div class="score-label" data-lang-key="overall_score">Overall Score</div>
@@ -524,7 +543,9 @@ function displayChatMessage(message, isUser = false) {
     const chatMessages = document.getElementById('chatMessages');
     const messageDiv = document.createElement('div');
     messageDiv.className = `chat-message ${isUser ? 'user-message' : 'bot-message'}`;
-
+    
+    const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
     const formattedMessage = message
         .split('\n\n')
         .map(para => {
@@ -540,9 +561,53 @@ function displayChatMessage(message, isUser = false) {
         })
         .join('');
 
-    messageDiv.innerHTML = formattedMessage;
+    messageDiv.innerHTML = `
+        <div class="message-content">
+            <div class="message-avatar ${isUser ? 'user-avatar' : 'bot-avatar'}">
+                ${isUser ? '🙂' : '🤖'}
+            </div>
+            <div class="message-text">
+                ${formattedMessage}
+                <span class="message-timestamp">${timestamp}</span>
+            </div>
+        </div>
+    `;
+    
+    messageDiv.style.opacity = '0';
     chatMessages.appendChild(messageDiv);
+    
+    setTimeout(() => {
+        messageDiv.style.opacity = '1';
+        messageDiv.style.transform = 'translateY(0)';
+    }, 10);
+    
     chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function displayTypingIndicator() {
+    const chatMessages = document.getElementById('chatMessages');
+    const typingDiv = document.createElement('div');
+    typingDiv.id = 'typingIndicator';
+    typingDiv.className = 'chat-message bot-message typing-indicator';
+    typingDiv.innerHTML = `
+        <div class="message-content">
+            <div class="message-avatar bot-avatar">🤖</div>
+            <div class="message-text">
+                <div class="typing-dots">
+                    <span></span><span></span><span></span>
+                </div>
+            </div>
+        </div>
+    `;
+    chatMessages.appendChild(typingDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function removeTypingIndicator() {
+    const typingIndicator = document.getElementById('typingIndicator');
+    if (typingIndicator) {
+        typingIndicator.remove();
+    }
 }
 
 function switchMode(mode) {
@@ -567,76 +632,279 @@ function switchMode(mode) {
     }
 }
 
+async function fetchUniversitySuggestions(query) {
+    try {
+        const response = await fetch(`http://universities.hipolabs.com/search?name=${encodeURIComponent(query)}`);
+        if (!response.ok) throw new Error('Failed to fetch universities');
+        const data = await response.json();
+        return data.slice(0, 5).map(uni => uni.name);
+    } catch (error) {
+        console.error('University suggestion error:', error);
+        return [];
+    }
+}
+
+async function fetchKeywordSuggestions(category) {
+    // Mock suggestions; replace with backend endpoint if available
+    const suggestions = {
+        working_student: ['part-time work', 'student jobs', 'work regulations'],
+        housing: ['dormitory', 'student accommodation', 'rent costs'],
+        research: ['research programs', 'thesis opportunities', 'labs'],
+        internship: ['internship programs', 'placements', 'traineeships'],
+        job_offers: ['career fairs', 'job postings', 'employment'],
+        scholarships: ['financial aid', 'grants', 'bursaries'],
+        visas: ['student visa', 'residence permit', 'immigration'],
+        custom: ['enter keywords', 'specific terms', 'custom query']
+    };
+    return suggestions[category] || [];
+}
+
+function displaySuggestions(suggestions, containerId, selectCallback) {
+    const container = document.getElementById(containerId);
+    container.innerHTML = suggestions.length ? suggestions.map(item => `
+        <div class="suggestion-item" role="button" tabindex="0">${item}</div>
+    `).join('') : '<div class="suggestion-item no-suggestions">No suggestions</div>';
+
+    container.querySelectorAll('.suggestion-item:not(.no-suggestions)').forEach(item => {
+        item.addEventListener('click', () => {
+            selectCallback(item.textContent);
+            container.innerHTML = '';
+        });
+        item.addEventListener('keypress', e => {
+            if (e.key === 'Enter') {
+                selectCallback(item.textContent);
+                container.innerHTML = '';
+            }
+        });
+    });
+}
+
+// Modified: Enhanced student search with event delegation and form reset
+let isSearching = false;
 async function handleStudentSearch(event) {
     event.preventDefault();
-    
-    const university = document.getElementById('universityInput').value;
-    const category = document.getElementById('categorySelect').value;
-    const customKeywords = document.getElementById('customKeywords').value;
-    
+    console.log('Student search form submitted at', new Date().toISOString()); // Debug: Confirm submission
+
+    if (isSearching) {
+        console.log('Search in progress, ignoring new submission');
+        return;
+    }
+    isSearching = true;
+
+    const studentForm = document.getElementById('studentSearchForm');
+    const universityInput = document.getElementById('universityInput');
+    const category = document.querySelector('input[name="category"]:checked')?.value;
+    const customKeywords = document.getElementById('customKeywords')?.value.trim();
+    const searchButton = document.querySelector('#studentSearchForm button[type="submit"]');
+
+    if (!studentForm) {
+        console.error('Student search form not found in DOM');
+        isSearching = false;
+        return;
+    }
+
+    if (!universityInput.value.trim()) {
+        showError(translations[currentLanguage]?.no_university || 'Please enter a university name.');
+        universityInput.focus();
+        isSearching = false;
+        return;
+    }
+
+    if (category === 'custom' && !customKeywords) {
+        showError(translations[currentLanguage]?.no_keywords || 'Please enter custom keywords.');
+        document.getElementById('customKeywords').focus();
+        isSearching = false;
+        return;
+    }
+
+    if (searchButton) searchButton.disabled = true;
+
     try {
+        console.log(`Sending student search: university=${universityInput.value}, category=${category}, keywords=${customKeywords || 'none'}`);
+        const loadingSpinner = document.getElementById('loadingSpinner');
+        loadingSpinner.style.display = 'flex';
+        document.getElementById('searchResults').innerHTML = '';
+
         const response = await fetch('/api/student/search', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                university,
+                university: universityInput.value,
                 category,
-                keywords: category === 'custom' ? customKeywords.split(',').map(k => k.trim()) : undefined,
+                keywords: category === 'custom' ? customKeywords.split(',').map(k => k.trim()).filter(k => k) : undefined,
                 language: currentLanguage
             })
         });
 
+        console.log('Search API response status:', response.status);
+
         if (!response.ok) {
-            throw new Error('Search failed');
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Search failed');
         }
 
         const data = await response.json();
+        console.log('Student search response:', data);
         displayStudentResults(data);
     } catch (error) {
+        console.error('Student search error:', error);
         showError(`${translations[currentLanguage]?.error_occurred || 'Search failed'}: ${error.message}`);
+        document.getElementById('searchResults').innerHTML = `<p class="error-message">${error.message}</p>`;
+    } finally {
+        loadingSpinner.style.display = 'none';
+        if (searchButton) searchButton.disabled = false;
+        isSearching = false;
+        // Reset form to ensure clean state
+        studentForm.reset();
+        document.getElementById('customKeywordsContainer').style.display = category === 'custom' ? 'block' : 'none';
+        console.log('Form reset and search state cleared');
     }
 }
 
 function displayStudentResults(data) {
-    if (data.status !== 'success') {
-        showError(data.error || translations[currentLanguage]?.no_results || 'Search failed');
+    const resultsDiv = document.getElementById('searchResults');
+    resultsDiv.style.display = 'block';
+    resultsDiv.innerHTML = '';
+
+    if (data.status === 'error') {
+        resultsDiv.innerHTML = `<p class="error-message">${translations[currentLanguage]?.error_occurred || 'Error'}: ${data.error}</p>`;
         return;
     }
 
-    const resultsHtml = `
-        <div class="card">
-            <div class="search-summary">
-                <h3 data-lang-key="search_results">Search Results</h3>
-                <p data-lang-key="results_for">Results for ${data.university}</p>
-                <p data-lang-key="found_results">Found ${data.summary.total_results} relevant results</p>
+    const { university, category, summary, results, total_results } = data;
+    const categoryName = category === 'custom' 
+        ? (translations[currentLanguage]?.category_custom || 'Custom Search')
+        : (translations[currentLanguage]?.[`category_${category}`] || formatTitle(category));
+    
+    resultsDiv.innerHTML = `
+        <div class="search-summary">
+            <h3 data-lang-key="search_results">${translations[currentLanguage]?.search_results || 'Search Results'}</h3>
+            <p data-lang-key="results_for">${translations[currentLanguage]?.results_for || 'Results for'} ${categoryName} at ${university}</p>
+            <p data-lang-key="found_results">${translations[currentLanguage]?.found_results || 'Found'} ${total_results} ${translations[currentLanguage]?.relevant_results || 'relevant results'}</p>
+            <p><strong>${translations[currentLanguage]?.summary || 'Summary'}:</strong> ${summary.recommendation || 'No summary provided'}</p>
+            <div class="sort-controls">
+                <label for="sortResults">${translations[currentLanguage]?.sort_by || 'Sort by'}:</label>
+                <select id="sortResults" aria-label="Sort search results">
+                    <option value="relevance">${translations[currentLanguage]?.sort_relevance || 'Relevance'}</option>
+                    <option value="title">${translations[currentLanguage]?.sort_title || 'Title'}</option>
+                </select>
             </div>
-            ${data.results.map(result => `
-                <div class="search-result">
-                    <h4 class="result-title">
-                        <a href="${result.url}" target="_blank">${result.title}</a>
-                    </h4>
-                    <p class="result-summary">${result.content_summary}</p>
-                    <div class="result-meta">
-                        <div class="keywords">
-                            ${result.matched_keywords.map(kw => `<span class="keyword-tag">${kw}</span>`).join('')}
-                        </div>
-                        <div class="relevance">
-                            <span class="relevance-score">
-                                ${translations[currentLanguage]?.relevance_score || 'Relevance'}: ${result.relevance.toFixed(2)}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            `).join('')}
         </div>
     `;
 
-    const searchResults = document.getElementById('searchResults');
-    searchResults.innerHTML = resultsHtml;
-    searchResults.style.display = 'block';
+    if (total_results === 0) {
+        const guessedDomain = university.toLowerCase().replace(/[\s\W]+/g, '-') + '.edu';
+        resultsDiv.innerHTML += `
+            <p>${translations[currentLanguage]?.no_results || 'No regulations found for'} ${categoryName}. 
+            ${translations[currentLanguage]?.try_another || 'Try another category or visit'} 
+            <a href="https://${guessedDomain}" target="_blank">${university} ${translations[currentLanguage]?.website || 'website'}</a>.</p>
+        `;
+        return;
+    }
+
+    const sortedResults = [...results];
+    const sortSelect = resultsDiv.querySelector('#sortResults');
+    sortSelect.addEventListener('change', () => {
+        console.log('Sorting results by:', sortSelect.value);
+        const sortBy = sortSelect.value;
+        sortedResults.sort((a, b) => {
+            if (sortBy === 'relevance') return b.relevance_score - a.relevance_score;
+            if (sortBy === 'title') return a.title.localeCompare(b.title);
+            return 0;
+        });
+        displaySortedResults(sortedResults, resultsDiv, university, categoryName);
+    });
+
+    displaySortedResults(sortedResults, resultsDiv, university, categoryName);
     updateLanguageStrings();
+}
+
+function displaySortedResults(results, resultsDiv, university, categoryName) {
+    const resultsList = results.map((result, index) => `
+        <div class="search-result card" data-result-id="${index}">
+            <h4 class="result-title">
+                <a href="${result.url}" target="_blank">${result.title}</a>
+            </h4>
+            <p class="result-summary">${result.content_summary || result.content.substring(0, 200)}...</p>
+            <ul class="key-points">
+                ${result.key_points?.map(point => `<li>${point}</li>`).join('') || '<li>No key points available</li>'}
+            </ul>
+            <div class="result-meta">
+                <div class="keywords">
+                    ${(result.matched_keywords || []).map(kw => `<span class="keyword-tag">${kw}</span>`).join('')}
+                </div>
+                <div class="relevance">
+                    <span class="relevance-score">
+                        ${translations[currentLanguage]?.relevance_score || 'Relevance'}: ${result.relevance_score.toFixed(2)}
+                    </span>
+                </div>
+            </div>
+            <div class="result-actions">
+                <button class="btn action-btn ask-btn" data-title="${result.title}" data-lang-key="ask_about">${translations[currentLanguage]?.ask_about || 'Ask About This'}</button>
+                <button class="btn action-btn copy-btn" data-url="${result.url}" data-lang-key="copy_url">${translations[currentLanguage]?.copy_url || 'Copy URL'}</button>
+            </div>
+        </div>
+    `).join('');
+
+    const existingSummary = resultsDiv.querySelector('.search-summary');
+    resultsDiv.innerHTML = '';
+    if (existingSummary) {
+        resultsDiv.appendChild(existingSummary);
+    }
+    resultsDiv.innerHTML += resultsList;
+
+    resultsDiv.querySelectorAll('.ask-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            console.log('Ask button clicked for:', btn.getAttribute('data-title'));
+            const title = btn.getAttribute('data-title');
+            switchMode('contract');
+            const chatInput = document.getElementById('chatInput');
+            chatInput.value = `Tell me more about ${title}`;
+            chatInput.focus();
+        });
+    });
+
+    resultsDiv.querySelectorAll('.copy-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            console.log('Copy URL button clicked:', btn.getAttribute('data-url'));
+            const url = btn.getAttribute('data-url');
+            navigator.clipboard.writeText(url).then(() => {
+                showError(translations[currentLanguage]?.url_copied || 'URL copied to clipboard!', true);
+            }).catch(err => {
+                console.error('Copy URL error:', err);
+                showError(translations[currentLanguage]?.copy_failed || 'Failed to copy URL.');
+            });
+        });
+    });
+}
+
+function autoResizeTextarea() {
+    const textarea = document.getElementById('chatInput');
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
+}
+
+// Modified: Use event delegation for student form submission
+function setupStudentFormListener() {
+    const studentSection = document.getElementById('studentSection');
+    if (!studentSection) {
+        console.error('Student section not found in DOM');
+        return;
+    }
+
+    // Remove any existing listeners to prevent duplicates
+    studentSection.removeEventListener('submit', handleStudentFormSubmit);
+    studentSection.addEventListener('submit', handleStudentFormSubmit);
+    console.log('Student form submit listener attached via delegation');
+}
+
+function handleStudentFormSubmit(event) {
+    if (event.target.matches('#studentSearchForm')) {
+        console.log('Delegated submit event triggered for studentSearchForm');
+        handleStudentSearch(event);
+    }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -644,7 +912,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = document.getElementById('uploadForm');
         if (form) {
             form.addEventListener('submit', handleFileUpload);
-            console.log('Form submit handler attached');
+            console.log('Form submit handler attached for uploadForm');
         }
 
         const chatInput = document.getElementById('chatInput');
@@ -653,19 +921,31 @@ document.addEventListener('DOMContentLoaded', () => {
             chatInput.addEventListener('keypress', e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
+                    console.log('Enter key pressed in chatInput');
                     sendChatMessage();
                 }
             });
+            chatInput.addEventListener('input', autoResizeTextarea);
         }
         if (sendButton) {
-            sendButton.addEventListener('click', sendChatMessage);
+            sendButton.addEventListener('click', () => {
+                console.log('Send message button clicked');
+                sendChatMessage();
+            });
         }
 
         const contractBtn = document.getElementById('contractModeBtn');
         const studentBtn = document.getElementById('studentModeBtn');
         if (contractBtn && studentBtn) {
-            contractBtn.addEventListener('click', () => switchMode('contract'));
-            studentBtn.addEventListener('click', () => switchMode('student'));
+            contractBtn.addEventListener('click', () => {
+                console.log('Switching to contract mode');
+                switchMode('contract');
+            });
+            studentBtn.addEventListener('click', () => {
+                console.log('Switching to student mode');
+                switchMode('student');
+                setupStudentFormListener(); // Reattach listener on mode switch
+            });
         }
 
         const savedMode = localStorage.getItem('currentMode') || 'contract';
@@ -679,22 +959,61 @@ document.addEventListener('DOMContentLoaded', () => {
             updateMarksTranslations();
         }
 
-        const categorySelect = document.getElementById('categorySelect');
-        if (categorySelect) {
-            categorySelect.addEventListener('change', function() {
-                const customContainer = document.getElementById('customKeywordsContainer');
-                customContainer.style.display = this.value === 'custom' ? 'block' : 'none';
+        // Setup student form listener
+        setupStudentFormListener();
+
+        const universityInput = document.getElementById('universityInput');
+        if (universityInput) {
+            universityInput.addEventListener('input', () => {
+                console.log('University input changed:', universityInput.value);
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(async () => {
+                    const query = universityInput.value.trim();
+                    if (query.length >= 3) {
+                        const suggestions = await fetchUniversitySuggestions(query);
+                        displaySuggestions(suggestions, 'universitySuggestions', text => {
+                            universityInput.value = text;
+                        });
+                    } else {
+                        document.getElementById('universitySuggestions').innerHTML = '';
+                    }
+                }, 300);
             });
         }
 
-        const studentForm = document.getElementById('studentSearchForm');
-        if (studentForm) {
-            studentForm.addEventListener('submit', handleStudentSearch);
+        const customInput = document.getElementById('customKeywords');
+        if (customInput) {
+            customInput.addEventListener('input', () => {
+                console.log('Custom keywords input changed:', customInput.value);
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(async () => {
+                    const category = document.querySelector('input[name="category"]:checked')?.value;
+                    if (category === 'custom') {
+                        const suggestions = await fetchKeywordSuggestions(category);
+                        displaySuggestions(suggestions, 'keywordSuggestions', text => {
+                            customInput.value = text;
+                        });
+                    }
+                }, 300);
+            });
         }
+
+        const categoryInputs = document.querySelectorAll('input[name="category"]');
+        categoryInputs.forEach(input => {
+            input.addEventListener('change', () => {
+                console.log('Category changed:', input.value);
+                const customContainer = document.getElementById('customKeywordsContainer');
+                customContainer.style.display = input.value === 'custom' ? 'block' : 'none';
+                document.getElementById('keywordSuggestions').innerHTML = '';
+            });
+        });
 
         const languageSelect = document.getElementById('languageSelect');
         if (languageSelect) {
-            languageSelect.addEventListener('change', changeLanguage);
+            languageSelect.addEventListener('change', () => {
+                console.log('Language changed:', languageSelect.value);
+                changeLanguage();
+            });
         }
 
         window.addEventListener('beforeunload', endChatSession);

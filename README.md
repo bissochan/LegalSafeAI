@@ -1,27 +1,28 @@
 # LegalSafeAI
 
-LegalSafeAI is a comprehensive contract analysis tool that leverages AI to provide detailed assessments of employment contracts. It combines multiple analysis approaches to identify potential issues, evaluate contract terms, and provide actionable recommendations.
+An AI-powered legal document analysis tool with built-in student information search capabilities.
 
 ## Features
 
-- **Shadow Analysis**: Identifies ambiguous areas, potential risks, and unfavorable clauses
-- **Detailed Contract Analysis**: Evaluates 17 key contract aspects including:
-  - Sick leave, vacation, and overtime policies
-  - Termination clauses
-  - Confidentiality and non-compete agreements
-  - Intellectual property rights
-  - Benefits and compensation
-  - Work hours and responsibilities
-- **Multi-Model Evaluation**: Uses multiple AI models to validate analysis accuracy
-- **PDF Processing**: Handles both native PDFs and scanned documents
-- **Web Interface**: User-friendly interface for contract uploads and analysis
-- **Structured Output**: Generates detailed JSON reports with scores and recommendations
+### Contract Analysis
+- Automatic contract parsing and analysis
+- Risk assessment and scoring
+- Section-by-section evaluation
+- Multi-language support (EN, ES, FR, IT, DE)
+- Interactive Q&A with the contract
+- Translation of analysis results
 
-## Documentation
-
-For detailed information about the project, please refer to:
-- [Architecture Documentation](https://docs.google.com/document/d/16NRgPNfQAgirhzmx4Sdm4cbQvAZzv7McQdEldCN5jtY/edit?usp=sharing)
-- [Requirements Documentation](https://docs.google.com/document/d/1yWA7sgaBD_8a07xRo1Rd_r1ITXn7VDPXf0ucCEgiOy4/edit?usp=sharing)
+### Student Information Search
+- University-specific information search
+- Multiple search categories:
+  - Working student regulations
+  - Student housing
+  - Research opportunities
+  - Internships
+  - Job offers
+- Custom keyword search capability
+- Relevance scoring
+- Multi-language support
 
 ## Installation
 
@@ -31,52 +32,95 @@ git clone https://github.com/yourusername/LegalSafeAI.git
 cd LegalSafeAI
 ```
 
-2. Install required dependencies:
+2. Create and activate a virtual environment:
+```bash
+python -m venv venv
+.\venv\Scripts\activate
+```
+
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Set up environment variables:
+4. Set up environment variables:
 Create a `.env` file with:
+```env
+FLASK_SECRET_KEY=your_secret_key
+OPENROUTER_API_KEY=your_openrouter_api_key
+SERPAPI_KEY=your_serp_api_key
 ```
-OPENROUTER_API_KEY=your_api_key_here
-```
-
-4. Install Tesseract OCR (for scanned document support):
-- Windows: Download and install from [Tesseract GitHub](https://github.com/UB-Mannheim/tesseract/wiki)
-- Linux: `sudo apt-get install tesseract-ocr`
-- Mac: `brew install tesseract`
 
 ## Usage
 
-### Command Line Interface
+1. Start the Flask application:
 ```bash
-python main.py
+python run.py
 ```
 
-### Web Interface
-```bash
-python legalApp.py
+2. Open your browser and navigate to:
 ```
-Then open `http://localhost:5000` in your browser.
+http://localhost:5000
+```
 
-## API Components
+### Contract Analysis
+1. Click "Contract Analysis" mode
+2. Upload a contract document (.pdf, .docx, .txt)
+3. Click "Analyze Contract"
+4. View the analysis results and scores
+5. Use the chat feature to ask questions about the contract
 
-- **ShadowAgent**: Identifies potential risks and ambiguities
-- **ContractAnalyzerAgent**: Performs detailed contract analysis
-- **ResponseEvaluator**: Validates analysis accuracy
-- **PdfExtractor**: Handles PDF text extraction
+### Student Information Search
+1. Click "Student Search" mode
+2. Enter university name
+3. Select search category or use custom search
+4. View relevant results with sources and relevance scores
 
-## Output Format
+## Requirements
 
-The analysis generates a structured JSON output including:
-- Metadata (timestamp, contract name, overall score)
-- Structured analysis of 17 contract aspects
-- Executive summary
-- Key points
-- Potential issues
-- Recommendations
-- Evaluation scores from multiple models
+```
+python 3.8+
+pydantic
+python-dotenv
+pymupdf
+numpy
+pillow
+requests
+pydantic-ai
+flask
+flask-session
+werkzeug
+apscheduler
+gunicorn
+python-docx
+asyncio
+fuzzywuzzy
+python-Levenshtein
+pdfplumber
+```
+
+## API Endpoints
+
+### Contract Analysis
+- `/api/document/extract` - Extract text from documents
+- `/api/shadow/analyze` - Perform deep analysis
+- `/api/summary/analyze` - Generate contract summary
+- `/api/evaluator/evaluate` - Score contract sections
+- `/api/translator/translate` - Translate results
+- `/api/chat/start` - Start chat session
+- `/api/chat/message` - Send chat message
+- `/api/chat/end` - End chat session
+
+### Student Search
+- `/api/student/search` - Search university information
+- `/api/web/focused-search` - Perform focused web search
+
+## Configuration
+
+The application can be configured through environment variables:
+- `FLASK_SECRET_KEY` - Application secret key
+- `OPENROUTER_API_KEY` - OpenRouter API key for AI analysis
+- `SERPAPI_KEY` - SerpAPI key for web searches
 
 ## Contributing
 
@@ -88,10 +132,9 @@ The analysis generates a structured JSON output including:
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Distributed under the MIT License. See `LICENSE` for more information.
 
-## Acknowledgments
+## Contact
 
-- OpenRouter API for AI model access
-- Tesseract OCR for document processing
-- PyMuPDF for PDF handling
+Your Name - [@yourtwitter](https://twitter.com/yourtwitter)
+Project Link: [https://github.com/yourusername/LegalSafeAI](https://github.com/yourusername/LegalSafeAI)
