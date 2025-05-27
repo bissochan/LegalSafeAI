@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os
 import logging
 import re
+from typing import List, Dict, Any
 
 # Configura il logging
 logging.basicConfig(level=logging.INFO)
@@ -78,6 +79,40 @@ class EvaluatorAgent:
                 }
             }
 
+        except Exception as e:
+            logger.error(f"Evaluation failed: {str(e)}")
+            raise
+
+    def evaluate(self, text: str, focal_points: List[str] = None) -> Dict[str, Any]:
+        """
+        Evaluate contract with optional focal points
+        
+        Args:
+            text: Contract text to evaluate
+            focal_points: Optional list of specific areas to focus on
+        """
+        try:
+            # Default evaluation areas
+            evaluation_areas = {
+                'liability': 0,
+                'work_hours': 0,
+                'compensation': 0,
+                'termination': 0,
+                'confidentiality': 0,
+                'non_compete': 0,
+                'benefits': 0,
+                'intellectual_property': 0,
+                'dispute_resolution': 0
+            }
+
+            # Prioritize focal points if provided
+            if focal_points:
+                for point in focal_points:
+                    if point not in evaluation_areas:
+                        evaluation_areas[point] = 0
+
+            return evaluation_areas
+            
         except Exception as e:
             logger.error(f"Evaluation failed: {str(e)}")
             raise

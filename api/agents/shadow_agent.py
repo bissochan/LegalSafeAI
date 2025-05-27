@@ -2,6 +2,7 @@ import requests
 import json
 from dotenv import load_dotenv
 import os
+from typing import List, Dict, Any
 
 class ShadowAgent:
     def __init__(self):
@@ -13,14 +14,31 @@ class ShadowAgent:
         if not self.api_key:
             raise ValueError("API key not found. Please set OPENROUTER_API_KEY in your .env file.")
 
+        self.base_prompt = """You are a legal contract analysis expert. Analyze the contract provided and generate a detailed report.
+        If focal points are provided, pay special attention to those areas while maintaining a comprehensive analysis.
+        
+        Structure your analysis as follows:
+        1. Overview of key terms and conditions
+        2. Detailed analysis of focal points (if provided) or main contract sections
+        3. Potential risks and concerns
+        4. Recommendations for improvement
+        5. Overall assessment
+        
+        For each focal point or main section:
+        - Explain the relevant terms
+        - Identify potential issues
+        - Suggest improvements
+        - Rate the clarity and fairness (1-10)
+        """
 
-    def analyze(self, contract_text: str, language: str = 'en') -> str:
+    def analyze(self, contract_text: str, language: str = 'en', focal_points: List[str] = None) -> str:
         """
         Analyze the provided contract for gray areas in the specified language.
 
         Args:
             contract_text (str): The contract to analyze.
             language (str): The language for the analysis response.
+            focal_points: Optional list of specific areas to focus on
 
         Returns:
             str: The analysis result from the model.
@@ -52,6 +70,14 @@ class ShadowAgent:
             Provide a concise summary of the main critical points identified.
             Always respond kind and polite."""
 
+        # Prepare the prompt
+        if focal_points:
+            analysis_prompt = f"{system_prompt}\n\nFocus especially on these areas:\n"
+            for point in focal_points:
+                analysis_prompt += f"- {point}\n"
+        else:
+            analysis_prompt = system_prompt
+
         response = requests.post(
             url="https://openrouter.ai/api/v1/chat/completions",
             headers={
@@ -62,7 +88,7 @@ class ShadowAgent:
                 "messages": [
                     {
                         "role": "system",
-                        "content": system_prompt
+                        "content": analysis_prompt
                     },
                     {
                         "role": "user",

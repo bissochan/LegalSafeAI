@@ -13,15 +13,23 @@ def analyze_contract():
         data = request.get_json()
         if not data or 'text' not in data:
             return jsonify({'error': 'No text provided'}), 400
-            
-        language = data.get('language', 'en')
-        analysis = shadow_agent.analyze(data['text'], language=language)
+
+        # Get optional focal points
+        focal_points = data.get('focal_points', None)
         
-        return jsonify({
-            'status': 'success',
-            'analysis': analysis
-        })
+        # Validate focal points if provided
+        if focal_points and (not isinstance(focal_points, list) or len(focal_points) > 5):
+            return jsonify({
+                'error': 'Focal points must be a list of 5 or fewer items'
+            }), 400
+
+        analysis_results = shadow_agent.analyze(
+            text=data['text'],
+            focal_points=focal_points
+        )
+
+        return jsonify(analysis_results)
 
     except Exception as e:
-        logger.error(f"Shadow analysis error: {str(e)}")
+        logger.error(f"Analysis error: {str(e)}")
         return jsonify({'error': str(e)}), 500

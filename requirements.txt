@@ -15,6 +15,3 @@ dotenv
 python-docx
 requests
 asyncio
-fuzzywuzzy
-python-Levenshtein 
-pdfplumber
