@@ -72,13 +72,18 @@ def analyze_contract():
 
         user_language = data.get('language', 'en')
         contract_text = data['text']
+        focal_points = data.get('focal_points', None)
         logger.debug(f"Analyzing contract with language: {user_language}")
 
         # Perform shadow analysis in English
         logger.debug("Starting shadow analysis")
         shadow_response = requests.post(
             f"{request.host_url}api/shadow/analyze",
-            json={'text': contract_text, 'language': 'en'}
+            json={
+                'text': contract_text, 
+                'focal_points': focal_points,
+                'language': 'en'
+            }
         )
         if shadow_response.status_code != 200:
             logger.error(f"Shadow analysis failed: {shadow_response.status_code}")
@@ -89,7 +94,11 @@ def analyze_contract():
         logger.debug("Starting summary analysis")
         summary_response = requests.post(
             f"{request.host_url}api/summary/analyze",
-            json={'text': contract_text, 'language': 'en'}
+            json={
+                'text': contract_text, 
+                'focal_points': focal_points,
+                'language': 'en'
+            }
         )
         if summary_response.status_code != 200:
             logger.error(f"Summary analysis failed: {summary_response.status_code}")
@@ -104,7 +113,7 @@ def analyze_contract():
                 'text': contract_text,
                 'shadow_analysis': shadow_analysis,
                 'summary': summary,
-                'language': 'en'
+                'focal_points': focal_points
             }
         )
         if eval_response.status_code != 200:

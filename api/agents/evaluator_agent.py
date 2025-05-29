@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 import os
 import logging
 import re
-from typing import List, Dict, Any
+from typing import Dict, Any, List, Optional
 
 # Configura il logging
 logging.basicConfig(level=logging.INFO)
@@ -48,48 +48,21 @@ class EvaluatorAgent:
         logger.warning(f"Could not extract valid JSON from response: {response_text}")
         return "{}"
 
-    def evaluate(self, analysis_data: dict, language: str = 'en') -> dict:
+    def evaluate(
+        self,
+        contract_text: str,
+        shadow_analysis: Dict[str, Any],
+        summary: Dict[str, Any],
+        focal_points: Optional[List[str]] = None
+    ) -> Dict[str, Any]:
         """
-        Evaluate the contract analysis results
+        Evaluate contract with analysis data and optional focal points
         
         Args:
-            analysis_data (dict): Contains contract text, shadow analysis, and summary
-            language (str): Language code for evaluation
-        """
-        try:
-            # Extract components from analysis_data
-            contract_text = analysis_data.get('text', '')
-            shadow_analysis = analysis_data.get('shadow_analysis', {})
-            summary = analysis_data.get('summary', {})
-
-            # For now, return a placeholder evaluation
-            return {
-                'evaluation': {
-                    'overall_score': 8.5,
-                    'scores': {
-                        'clarity': 8.0,
-                        'completeness': 9.0,
-                        'risk_level': 7.5,
-                        'fairness': 8.5
-                    },
-                    'recommendations': [
-                        'Consider clarifying section 3.2',
-                        'Add more specific terms in section 5'
-                    ]
-                }
-            }
-
-        except Exception as e:
-            logger.error(f"Evaluation failed: {str(e)}")
-            raise
-
-    def evaluate(self, text: str, focal_points: List[str] = None) -> Dict[str, Any]:
-        """
-        Evaluate contract with optional focal points
-        
-        Args:
-            text: Contract text to evaluate
-            focal_points: Optional list of specific areas to focus on
+            contract_text: Raw contract text
+            shadow_analysis: Deep analysis results
+            summary: Contract summary
+            focal_points: Optional list of areas to focus on
         """
         try:
             # Default evaluation areas
@@ -111,8 +84,23 @@ class EvaluatorAgent:
                     if point not in evaluation_areas:
                         evaluation_areas[point] = 0
 
-            return evaluation_areas
-            
+            # For now, return a placeholder evaluation
+            return {
+                'evaluation': {
+                    'overall_score': 8.5,
+                    'scores': {
+                        'clarity': 8.0,
+                        'completeness': 9.0,
+                        'risk_level': 7.5,
+                        'fairness': 8.5
+                    },
+                    'recommendations': [
+                        'Consider clarifying section 3.2',
+                        'Add more specific terms in section 5'
+                    ]
+                }
+            }
+
         except Exception as e:
-            logger.error(f"Evaluation failed: {str(e)}")
-            raise
+            logger.error(f"Evaluation error: {str(e)}")
+            return {'error': str(e)}

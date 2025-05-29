@@ -1,102 +1,124 @@
-from flask import Blueprint, request, jsonify, session
-from agents.chat_agent import ChatAgent
+from flask import Blueprint, request, jsonify
 import logging
+import uuid
+from datetime import datetime
+import requests
+from requests.exceptions import RequestException
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 chat_bp = Blueprint('chat', __name__)
-chat_agent = ChatAgent()
 logger = logging.getLogger(__name__)
+
+# In-memory session storage (replace with database/Redis in production)
+chat_sessions = {}
+
+# OpenRouter API configuration
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
+OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 @chat_bp.route('/start', methods=['POST'])
 def start_chat():
-    """Initialize chat session with contract context"""
+    logger.info("Starting new chat session")
     try:
         data = request.get_json()
         if not data or 'contract_text' not in data:
+            logger.error("No contract text provided")
             return jsonify({'status': 'error', 'error': 'No contract text provided'}), 400
-            
-        session_id = chat_agent.initialize_session(
-            contract_text=data['contract_text'],
-            language=data.get('language', 'en')
-        )
         
-        session['chat_session_id'] = session_id
-        return jsonify({
-            'status': 'success',
-            'session_id': session_id
-        })
-
+        session_id = str(uuid.uuid4())
+        chat_sessions[session_id] = {
+            'contract_text': data['contract_text'],
+            'created_at': datetime.now(),
+            'messages': []
+        }
+        logger.info(f"Created chat session: {session_id}")
+        return jsonify({'status': 'success', 'session_id': session_id})
     except Exception as e:
-        logger.error(f"Chat initialization error: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'error': str(e)
-        }), 500
+        logger.error(f"Failed to start chat session: {str(e)}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
 
 @chat_bp.route('/message', methods=['POST'])
 def send_message():
-    """Send message to chat agent"""
+    logger.info("Processing chat message")
     try:
         data = request.get_json()
-        if not data or 'message' not in data:
-            return jsonify({'status': 'error', 'error': 'No message provided'}), 400
-            
-        session_id = session.get('chat_session_id')
-        if not session_id:
-            return jsonify({'status': 'error', 'error': 'No active chat session'}), 400
-            
-        response = chat_agent.process_message(
-            session_id=session_id,
-            message=data['message'],
-            language=data.get('language', 'en')
-        )
+        if not data or 'session_id' not in data or 'message' not in data:
+            logger.error("Missing session_id or message")
+            return jsonify({'status': 'error', 'error': 'Missing session_id or message'}), 400
         
-        return jsonify({
-            'status': 'success',
-            'response': response
+        session_id = data['session_id']
+        if session_id not in chat_sessions:
+            logger.error(f"No active chat session for session_id: {session_id}")
+            return jsonify({'status': 'error', 'error': 'No active chat session'}), 400
+        
+        question = data['message']
+        contract_text = chat_sessions[session_id]['contract_text']
+
+        # Prepare prompt for the chat agent
+        prompt = (
+            "You are an expert in analyzing employment contracts under Italian law. "
+            "Based on the following contract text, answer the user's question clearly and concisely. "
+            "Provide specific references to the contract where applicable.\n\n"
+            f"Contract Text:\n{contract_text}\n\n"
+            f"Question: {question}"
+        )
+
+        # Call OpenRouter API (or your chat agent)
+        try:
+            response = requests.post(
+                OPENROUTER_API_URL,
+                headers={
+                    'Authorization': f'Bearer {OPENROUTER_API_KEY}',
+                    'Content-Type': 'application/json'
+                },
+                json={
+                    'model': 'google/gemini-2.0-flash-001',  # Replace with your preferred model
+                    'messages': [
+                        {'role': 'system', 'content': prompt},
+                        {'role': 'user', 'content': question}
+                    ],
+                    'max_tokens': 500
+                },
+                timeout=15
+            )
+            response.raise_for_status()
+            chat_response = response.json().get('choices', [{}])[0].get('message', {}).get('content', 'No response generated')
+        except RequestException as e:
+            logger.error(f"OpenRouter API error: {str(e)}")
+            # Fallback response (replace with your fallback logic if needed)
+            chat_response = "Unable to process question due to API error. Please try again later."
+
+        # Store the interaction
+        chat_sessions[session_id]['messages'].append({
+            'question': question,
+            'response': chat_response,
+            'timestamp': datetime.now().isoformat()
         })
 
+        logger.info(f"Processed message for session: {session_id}")
+        return jsonify({'status': 'success', 'response': chat_response})
     except Exception as e:
-        logger.error(f"Message processing error: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'error': str(e)
-        }), 500
+        logger.error(f"Failed to process chat message: {str(e)}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
 
 @chat_bp.route('/end', methods=['POST'])
 def end_chat():
-    """End chat session"""
-    try:
-        session_id = session.get('chat_session_id')
-        if session_id:
-            chat_agent.end_session(session_id)
-            session.pop('chat_session_id', None)
-            
-        return jsonify({'status': 'success'})
-
-    except Exception as e:
-        logger.error(f"Chat end error: {str(e)}")
-        return jsonify({
-            'status': 'error',
-            'error': str(e)
-        }), 500
-
-@chat_bp.route('/update_language', methods=['POST'])
-def update_chat_language():
-    """Update the chat session language"""
+    logger.info("Ending chat session")
     try:
         data = request.get_json()
-        if not data or 'language' not in data:
-            logger.error("No language provided in chat language update")
-            return jsonify({'status': 'error', 'error': 'No language provided'}), 400
-
-        language = data['language']
-        session_id = session.get('chat_session_id')
-        if session_id:
-            chat_agent.update_session_language(session_id, language)
-        session['chat_language'] = language
-        logger.debug(f"Updated chat language to {language}")
+        if not data or 'session_id' not in data:
+            logger.error("Missing session_id")
+            return jsonify({'status': 'error', 'error': 'Missing session_id'}), 400
+        
+        session_id = data['session_id']
+        if session_id in chat_sessions:
+            del chat_sessions[session_id]
+            logger.info(f"Ended chat session: {session_id}")
         return jsonify({'status': 'success'})
-
     except Exception as e:
-        logger.error(f"Chat language update error: {str(e)}")
+        logger.error(f"Failed to end chat session: {str(e)}")
         return jsonify({'status': 'error', 'error': str(e)}), 500

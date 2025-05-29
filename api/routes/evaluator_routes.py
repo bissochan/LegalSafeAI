@@ -7,27 +7,30 @@ evaluator_agent = EvaluatorAgent()
 logger = logging.getLogger(__name__)
 
 @evaluator_bp.route('/evaluate', methods=['POST'])
-def evaluate_analysis():
+def evaluate_contract():
     """Evaluate contract analysis results"""
     try:
         data = request.get_json()
-        required_fields = ['text', 'shadow_analysis', 'summary']
-        
-        if not data or not all(field in data for field in required_fields):
-            return jsonify({
-                'status': 'error',
-                'error': 'Missing required fields'
-            }), 400
+        if not data or 'text' not in data:
+            return jsonify({'error': 'No text provided'}), 400
 
-        language = data.get('language', 'en')
-        evaluation = evaluator_agent.evaluate(
-            analysis_data=data,
-            language=language
+        # Extract required data
+        contract_text = data['text']
+        shadow_analysis = data.get('shadow_analysis', {})
+        summary = data.get('summary', {})
+        focal_points = data.get('focal_points', None)
+
+        # Call evaluator with correct parameters
+        evaluation_results = evaluator_agent.evaluate(
+            contract_text=contract_text,
+            shadow_analysis=shadow_analysis,
+            summary=summary,
+            focal_points=focal_points
         )
 
         return jsonify({
             'status': 'success',
-            'evaluation': evaluation
+            'evaluation': evaluation_results
         })
 
     except Exception as e:
