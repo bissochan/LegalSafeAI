@@ -19,11 +19,6 @@
             </select>
         </div>
 
-        <div class="mode-toggle">
-            <button id="contractModeBtn" class="mode-btn active" data-lang-key="contract_mode">Contract Analysis</button>
-            <button id="studentModeBtn" class="mode-btn" data-lang-key="student_mode">Student Search</button>
-        </div>
-
         <div id="contractSection">
             <div class="card">
                 <form id="uploadForm" enctype="multipart/form-data">
@@ -77,51 +72,6 @@
                             </svg>
                         </button>
                     </div>
-                </div>
-            </div>
-        </div>
-
-        <div id="studentSection" style="display: none;">
-            <div class="card">
-                <form id="studentSearchForm" class="search-section">
-                    <div class="form-group">
-                        <label for="universityInput" data-lang-key="university_name">University Name</label>
-                        <input type="text" id="universityInput" class="form-input" data-lang-key="university_placeholder" placeholder="Enter university name" aria-label="University name" required>
-                        <div id="universitySuggestions" class="suggestions-dropdown"></div>
-                    </div>
-                    <div class="form-group">
-                        <label data-lang-key="search_category">Search Category</label>
-                        <div class="category-chips">
-                            <input type="radio" name="category" id="working_student" value="working_student" checked>
-                            <label for="working_student" class="chip" data-lang-key="category_working">Working Student</label>
-                            <input type="radio" name="category" id="housing" value="housing">
-                            <label for="housing" class="chip" data-lang-key="category_housing">Housing</label>
-                            <input type="radio" name="category" id="research" value="research">
-                            <label for="research" class="chip" data-lang-key="category_research">Research</label>
-                            <input type="radio" name="category" id="internship" value="internship">
-                            <label for="internship" class="chip" data-lang-key="category_internship">Internships</label>
-                            <input type="radio" name="category" id="job_offers" value="job_offers">
-                            <label for="job_offers" class="chip" data-lang-key="category_jobs">Job Offers</label>
-                            <input type="radio" name="category" id="scholarships" value="scholarships">
-                            <label for="scholarships" class="chip" data-lang-key="category_scholarships">Scholarships</label>
-                            <input type="radio" name="category" id="visas" value="visas">
-                            <label for="visas" class="chip" data-lang-key="category_visas">Visas</label>
-                            <input type="radio" name="category" id="custom" value="custom">
-                            <label for="custom" class="chip" data-lang-key="category_custom">Custom</label>
-                        </div>
-                    </div>
-                    <div id="customKeywordsContainer" class="form-group" style="display: none;">
-                        <label for="customKeywords" data-lang-key="custom_keywords">Custom Keywords</label>
-                        <input type="text" id="customKeywords" class="form-input" data-lang-key="keywords_placeholder" placeholder="Enter keywords (comma-separated)" aria-label="Custom keywords">
-                        <div id="keywordSuggestions" class="suggestions-dropdown"></div>
-                    </div>
-                    <button type="submit" class="btn" data-lang-key="search">Search</button>
-                </form>
-            </div>
-            <div id="searchResults">
-                <div id="loadingSpinner" class="loading-spinner" style="display: none;">
-                    <div class="spinner"></div>
-                    <span data-lang-key="loading">Loading...</span>
                 </div>
             </div>
         </div>

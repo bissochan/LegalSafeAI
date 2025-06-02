@@ -1,3 +1,4 @@
+# api/legalApp.py
 from flask import Flask, request, jsonify, session, render_template, url_for
 from flask_session import Session
 import os
@@ -7,7 +8,7 @@ import logging
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 
-# Import routes from routes/
+# Import routes
 from routes.document_routes import document_bp
 from routes.shadow_routes import shadow_bp
 from routes.summary_routes import summary_bp
@@ -21,7 +22,7 @@ from routes.web_search_routes import web_search_bp
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__, 
+app = Flask(__name__,
     template_folder="../templates",
     static_folder="../static",
 )
@@ -37,6 +38,10 @@ app.config.update(
     SESSION_COOKIE_SAME_SITE='Lax',
     MAX_CONTENT_LENGTH=16 * 1024 * 1024  # 16MB max file size
 )
+
+# Ensure session directory exists
+if not os.path.exists(app.config['SESSION_FILE_DIR']):
+    os.makedirs(app.config['SESSION_FILE_DIR'])
 
 # Initialize Flask-Session
 Session(app)
@@ -80,7 +85,7 @@ def analyze_contract():
         shadow_response = requests.post(
             f"{request.host_url}api/shadow/analyze",
             json={
-                'text': contract_text, 
+                'text': contract_text,
                 'focal_points': focal_points,
                 'language': 'en'
             }
@@ -95,7 +100,7 @@ def analyze_contract():
         summary_response = requests.post(
             f"{request.host_url}api/summary/analyze",
             json={
-                'text': contract_text, 
+                'text': contract_text,
                 'focal_points': focal_points,
                 'language': 'en'
             }
@@ -133,7 +138,8 @@ def analyze_contract():
         session['english_analysis_results'] = analysis_results
         session['contract_text'] = contract_text
         session['chat_language'] = user_language
-        logger.debug(f"Stored English analysis results in session: {analysis_results}")
+        session.modified = True
+        logger.debug(f"Stored English analysis results in session")
 
         # Translate if not English
         if user_language != 'en':
@@ -145,20 +151,21 @@ def analyze_contract():
                     'language': user_language
                 }
             )
-            if translation_response.status_code == 200:
-                translated_data = translation_response.json()
-                if translated_data['status'] == 'success':
-                    analysis_results = translated_data['translated_content']
-                    analysis_results['translated_to'] = user_language
-                    logger.debug(f"Translated results to {user_language}")
-                else:
-                    logger.error(f"Translation failed: {translated_data.get('error')}")
-                    analysis_results['translated_to'] = 'en'  # Fallback
+            if translation_response.status_code == 200 and translation_response.json().get('status') == 'success':
+                analysis_results = translation_response.json()['translated_content']
+                analysis_results['translated_to'] = user_language
+                logger.debug(f"Translated results to {user_language}")
             else:
-                logger.error(f"Translation request failed: {translation_response.status_code}")
-                analysis_results['translated_to'] = 'en'  # Fallback
+                error_msg = translation_response.json().get('error', 'Unknown error')
+                logger.error(f"Translation failed: {error_msg}")
+                return jsonify({
+                    'status': 'error',
+                    'error': f"Translation to {user_language} failed: {error_msg}",
+                    'analysis_results': analysis_results,
+                    'translated_to': 'en'
+                }), 400
 
-        return jsonify(analysis_results)
+        return jsonify(analysis_results), 200
 
     except Exception as e:
         logger.error(f"Analysis error: {str(e)}")
@@ -176,7 +183,6 @@ def retranslate_analysis():
         user_language = data['language']
         logger.debug(f"Retranslating to language: {user_language}")
 
-        # Check session data
         if 'english_analysis_results' not in session:
             logger.error("No cached analysis results in session")
             return jsonify({
@@ -185,15 +191,14 @@ def retranslate_analysis():
             }), 400
 
         analysis_results = session['english_analysis_results']
-        logger.debug(f"Retrieved English analysis results: {analysis_results}")
+        logger.debug(f"Retrieved English analysis results")
 
         if user_language == 'en':
-            logger.debug("Returning English results")
             analysis_results['translated_to'] = 'en'
-            return jsonify(analysis_results)
+            session['chat_language'] = user_language
+            session.modified = True
+            return jsonify(analysis_results), 200
 
-        # Translate to new language
-        logger.debug(f"Translating to {user_language}")
         translation_response = requests.post(
             f"{request.host_url}api/translator/translate",
             json={
@@ -201,24 +206,26 @@ def retranslate_analysis():
                 'language': user_language
             }
         )
-        if translation_response.status_code == 200:
-            translated_data = translation_response.json()
-            if translated_data['status'] == 'success':
-                analysis_results = translated_data['translated_content']
-                analysis_results['translated_to'] = user_language
-                logger.debug(f"Translated results to {user_language}")
-            else:
-                logger.error(f"Translation failed: {translated_data.get('error')}")
-                analysis_results['translated_to'] = 'en'  # Fallback
+        if translation_response.status_code == 200 and translation_response.json().get('status') == 'success':
+            analysis_results = translation_response.json()['translated_content']
+            analysis_results['translated_to'] = user_language
+            session['chat_language'] = user_language
+            session.modified = True
+            logger.debug(f"Translated results to {user_language}")
+            return jsonify(analysis_results), 200
         else:
-            logger.error(f"Translation request failed: {translation_response.status_code}")
-            analysis_results['translated_to'] = 'en'  # Fallback
-
-        return jsonify(analysis_results)
+            error_msg = translation_response.json().get('error', 'Translation failed')
+            logger.error(f"Translation request failed: {error_msg}")
+            return jsonify({
+                'status': 'error',
+                'error': f"Translation to {user_language} failed: {error_msg}",
+                'translated_to': 'en',
+                'analysis_results': analysis_results
+            }), 400
 
     except Exception as e:
         logger.error(f"Retranslation error: {str(e)}")
-        return jsonify({'status': 'error', 'error': str(e)}), 500
+        return jsonify({'status': 'error', 'error': f"Retranslation failed: {str(e)}"}), 500
 
 @app.route('/api/chat/update_language', methods=['POST'])
 def update_chat_language():
@@ -231,6 +238,7 @@ def update_chat_language():
 
         language = data['language']
         session['chat_language'] = language
+        session.modified = True
         logger.debug(f"Updated chat language to {language}")
         return jsonify({'status': 'success'})
 

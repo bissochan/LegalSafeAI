@@ -1,3 +1,4 @@
+# routes/translator_routes.py
 from flask import Blueprint, request, jsonify
 from agents.translator_agent import TranslatorAgent
 import logging
@@ -26,12 +27,16 @@ def translate_analysis():
             target_language=target_language
         )
 
-        return jsonify(result)
+        if result['status'] == 'error':
+            logger.error(f"Translation failed: {result['error']}")
+            return jsonify(result), 400
+
+        return jsonify(result), 200
 
     except Exception as e:
         logger.error(f"Translation route error: {str(e)}")
         return jsonify({
             'status': 'error',
-            'error': str(e),
-            'translated_content': data.get('content', {})
+            'error': f"Translation failed: {str(e)}",
+            'translated_content': data.get('content', {}) if data else {}
         }), 500

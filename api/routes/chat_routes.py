@@ -1,3 +1,4 @@
+# api/routes/chat_routes.py
 from flask import Blueprint, request, jsonify
 import logging
 import uuid
@@ -24,14 +25,16 @@ OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 def start_chat():
     logger.info("Starting new chat session")
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data or 'contract_text' not in data:
             logger.error("No contract text provided")
             return jsonify({'status': 'error', 'error': 'No contract text provided'}), 400
-        
+
+        language = data.get('language', 'en')
         session_id = str(uuid.uuid4())
         chat_sessions[session_id] = {
             'contract_text': data['contract_text'],
+            'language': language,
             'created_at': datetime.now(),
             'messages': []
         }
@@ -45,20 +48,20 @@ def start_chat():
 def send_message():
     logger.info("Processing chat message")
     try:
-        data = request.get_json()
-        if not data or 'session_id' not in data or 'message' not in data:
+        data = request.get_json(silent=True)
+        if not data or 'message' not in data or 'session_id' not in data:
             logger.error("Missing session_id or message")
             return jsonify({'status': 'error', 'error': 'Missing session_id or message'}), 400
-        
+
         session_id = data['session_id']
-        if session_id not in chat_sessions:
+        if not session_id or session_id not in chat_sessions:
             logger.error(f"No active chat session for session_id: {session_id}")
             return jsonify({'status': 'error', 'error': 'No active chat session'}), 400
-        
+
         question = data['message']
         contract_text = chat_sessions[session_id]['contract_text']
+        language = chat_sessions[session_id].get('language', 'en')
 
-        # Prepare prompt for the chat agent
         prompt = (
             "You are an expert in analyzing employment contracts under Italian law. "
             "Based on the following contract text, answer the user's question clearly and concisely. "
@@ -67,7 +70,6 @@ def send_message():
             f"Question: {question}"
         )
 
-        # Call OpenRouter API (or your chat agent)
         try:
             response = requests.post(
                 OPENROUTER_API_URL,
@@ -76,7 +78,7 @@ def send_message():
                     'Content-Type': 'application/json'
                 },
                 json={
-                    'model': 'google/gemini-2.0-flash-001',  # Replace with your preferred model
+                    'model': 'google/gemini-2.0-flash-001',
                     'messages': [
                         {'role': 'system', 'content': prompt},
                         {'role': 'user', 'content': question}
@@ -89,10 +91,8 @@ def send_message():
             chat_response = response.json().get('choices', [{}])[0].get('message', {}).get('content', 'No response generated')
         except RequestException as e:
             logger.error(f"OpenRouter API error: {str(e)}")
-            # Fallback response (replace with your fallback logic if needed)
-            chat_response = "Unable to process question due to API error. Please try again later."
+            return jsonify({'status': 'error', 'error': 'Unable to process question due to API error'}), 500
 
-        # Store the interaction
         chat_sessions[session_id]['messages'].append({
             'question': question,
             'response': chat_response,
@@ -109,11 +109,11 @@ def send_message():
 def end_chat():
     logger.info("Ending chat session")
     try:
-        data = request.get_json()
+        data = request.get_json(silent=True)
         if not data or 'session_id' not in data:
-            logger.error("Missing session_id")
-            return jsonify({'status': 'error', 'error': 'Missing session_id'}), 400
-        
+            logger.error("Missing or invalid session_id")
+            return jsonify({'status': 'error', 'error': 'Missing or invalid session_id'}), 400
+
         session_id = data['session_id']
         if session_id in chat_sessions:
             del chat_sessions[session_id]
