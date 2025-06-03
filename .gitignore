@@ -180,3 +180,4 @@ contract_analysis_complete/
 flask_session/
 automated_tests/
 contracts/original/
+shadow_analysis/

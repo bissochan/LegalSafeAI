@@ -1,140 +1,76 @@
-# LegalSafeAI
+# LegalSafeAI - Contract Analyzer
 
-An AI-powered legal document analysis tool with built-in student information search capabilities.
+**LegalSafeAI** is an AI-powered web application designed to analyze legal contracts, providing detailed insights, scores, and recommendations. With a modern, user-friendly interface, it supports multiple languages, interactive chat for contract queries, and a comprehensive analysis of contract sections. Built with Flask, JavaScript, and a sleek CSS design, LegalSafeAI is ideal for legal professionals and individuals seeking to understand contract terms.
 
 ## Features
 
-### Contract Analysis
-- Automatic contract parsing and analysis
-- Risk assessment and scoring
-- Section-by-section evaluation
-- Multi-language support (EN, ES, FR, IT, DE)
-- Interactive Q&A with the contract
-- Translation of analysis results
+- **Contract Upload & Analysis**: Upload contracts in PDF, DOCX, or TXT format for automated analysis, including section scores, summary, detailed analysis, and evaluation.
+- **Multilingual Support**: Switch between English, Spanish, French, Italian, and German with real-time translation of UI and analysis results.
+- **Interactive Chat**: Ask questions about the contract with formatted responses (e.g., bold text, lists) powered by an AI chatbot.
+- **Modern UI**: Features a responsive sidebar, tabbed analysis results, collapsible chat panel, and enhanced score cards with hover effects.
+- **Accessible Design**: Includes ARIA attributes and keyboard navigation for improved accessibility.
+- **Chat History**: View past questions and answers for reference.
+- **Frequent Questions**: Quick access to commonly asked contract-related questions.
 
-### Student Information Search
-- University-specific information search
-- Multiple search categories:
-  - Working student regulations
-  - Student housing
-  - Research opportunities
-  - Internships
-  - Job offers
-- Custom keyword search capability
-- Relevance scoring
-- Multi-language support
+## Screenshots
+
+![Main Interface](screenshots/main_interface.png)  
+![Chat Panel](screenshots/chat_panel.png)  
+![Analysis Tabs](screenshots/analysis_tabs.png)  
+
+*Note: Replace placeholders with actual screenshots.*
+
+## Prerequisites
+
+- Python 3.8+
+- Node.js (optional, for frontend development)
+- A modern web browser (Chrome, Firefox, Safari, Edge)
+- Dependencies listed in `requirements.txt`
 
 ## Installation
 
-1. Clone the repository:
-```bash
-git clone https://github.com/yourusername/LegalSafeAI.git
-cd LegalSafeAI
-```
+1. **Clone the Repository**
+   ```bash
+   git clone https://github.com/yourusername/legalsafeai.git
+   cd legalsafeai
 
-2. Create and activate a virtual environment:
-```bash
+    Set Up a Virtual Environment
+    bash
+
 python -m venv venv
-.\venv\Scripts\activate
-```
+source venv/bin/activate  # On Windows use `venv\Scripts\activate`
 
-3. Install dependencies:
-```bash
+Install Dependencies
+bash
+
 pip install -r requirements.txt
-```
 
-4. Set up environment variables:
-Create a `.env` file with:
-```env
-FLASK_SECRET_KEY=your_secret_key
-OPENROUTER_API_KEY=your_openrouter_api_key
-SERPAPI_KEY=your_serp_api_key
-```
+Run the Application
+bash
 
-## Usage
+    python app.py
 
-1. Start the Flask application:
-```bash
-python run.py
-```
+    Access the Application
+    Open your browser and navigate to http://localhost:5000
 
-2. Open your browser and navigate to:
-```
-http://localhost:5000
-```
+Usage
 
-### Contract Analysis
-1. Click "Contract Analysis" mode
-2. Upload a contract document (.pdf, .docx, .txt)
-3. Click "Analyze Contract"
-4. View the analysis results and scores
-5. Use the chat feature to ask questions about the contract
+    Upload a contract file (PDF, DOCX, or TXT)
 
-### Student Information Search
-1. Click "Student Search" mode
-2. Enter university name
-3. Select search category or use custom search
-4. View relevant results with sources and relevance scores
+    View the automated analysis in the dashboard
 
-## Requirements
+    Interact with the AI chatbot for specific contract questions
 
-```
-python 3.8+
-pydantic
-python-dotenv
-pymupdf
-numpy
-pillow
-requests
-pydantic-ai
-flask
-flask-session
-werkzeug
-apscheduler
-gunicorn
-python-docx
-asyncio
-fuzzywuzzy
-python-Levenshtein
-pdfplumber
-```
+    Switch languages using the language selector
 
-## API Endpoints
+    Explore analysis tabs for detailed insights
 
-### Contract Analysis
-- `/api/document/extract` - Extract text from documents
-- `/api/shadow/analyze` - Perform deep analysis
-- `/api/summary/analyze` - Generate contract summary
-- `/api/evaluator/evaluate` - Score contract sections
-- `/api/translator/translate` - Translate results
-- `/api/chat/start` - Start chat session
-- `/api/chat/message` - Send chat message
-- `/api/chat/end` - End chat session
+Contributing
 
-### Student Search
-- `/api/student/search` - Search university information
-- `/api/web/focused-search` - Perform focused web search
+Contributions are welcome! Please fork the repository and submit a pull request with your improvements.
+License
 
-## Configuration
+MIT License
+Contact
 
-The application can be configured through environment variables:
-- `FLASK_SECRET_KEY` - Application secret key
-- `OPENROUTER_API_KEY` - OpenRouter API key for AI analysis
-- `SERPAPI_KEY` - SerpAPI key for web searches
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## License
-
-Distributed under the MIT License. See `LICENSE` for more information.
-
-## Contact
-
-Your Name - [@yourtwitter](https://twitter.com/yourtwitter)
-Project Link: [https://github.com/yourusername/LegalSafeAI](https://github.com/yourusername/LegalSafeAI)
+For questions or support, contact: your.email@example.com
