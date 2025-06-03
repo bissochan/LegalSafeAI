@@ -1,20 +1,26 @@
 // static/js/main.js
-let currentLanguage = 'en';
+let currentLanguage = localStorage.getItem('preferredLanguage') || 'en';
 let chatSessionId = null;
 let lastAnalysisResults = null;
-let currentMode = 'contract';
 let searchTimeout = null;
 
+function checkAuth() {
+    if (!localStorage.getItem('user_id')) {
+        // Only redirect if not already on the login page
+        if (window.location.pathname !== '/auth/login') {
+            window.location.href = '/auth/login';
+        }
+        return false;
+    }
+    return true;
+}
+
 function updateLanguageStrings() {
-    const elements = document.querySelectorAll('[data-lang-key]');
-    elements.forEach(element => {
+    document.querySelectorAll('[data-lang-key]').forEach(element => {
         const key = element.getAttribute('data-lang-key');
         if (translations[currentLanguage]?.[key]) {
             if (element.tagName === 'TEXTAREA' || (element.tagName === 'INPUT' && element.type === 'text')) {
                 element.placeholder = translations[currentLanguage][key];
-            } else if (element.tagName === 'LABEL' && element.classList.contains('chip')) {
-                element.textContent = translations[currentLanguage][key];
-                element.setAttribute('title', translations[currentLanguage][key + '_desc'] || translations[currentLanguage][key]);
             } else {
                 element.textContent = translations[currentLanguage][key];
             }
@@ -23,11 +29,9 @@ function updateLanguageStrings() {
 }
 
 function updateMarksTranslations() {
-    const markElements = document.querySelectorAll('[data-mark-key]');
-    markElements.forEach(element => {
+    document.querySelectorAll('[data-mark-key]').forEach(element => {
         const key = element.getAttribute('data-mark-key');
-        const translatedText = translations[currentLanguage]?.marks?.[key] || formatTitle(key);
-        element.textContent = translatedText;
+        element.textContent = translations[currentLanguage]?.marks?.[key] || formatTitle(key);
     });
 }
 
@@ -35,7 +39,7 @@ function changeLanguage() {
     const newLanguage = document.getElementById('languageSelect').value;
     if (currentLanguage === newLanguage) return;
 
-    console.log(`Changing language from ${currentLanguage} to ${newLanguage}`);
+    console.log(`Changing language to ${newLanguage}`);
     currentLanguage = newLanguage;
     localStorage.setItem('preferredLanguage', currentLanguage);
 
@@ -43,19 +47,17 @@ function changeLanguage() {
     updateMarksTranslations();
 
     if (lastAnalysisResults) {
-        console.log('Retranslating analysis results');
         retranslateAnalysisResults(currentLanguage);
     } else {
-        console.log('No analysis results to retranslate, updating chat language');
         updateChatLanguage(currentLanguage);
     }
 }
 
-function disableInputsDuringRetranslation(disable) {
+function disableInputs(disable) {
     const languageSelect = document.getElementById('languageSelect');
     const chatInput = document.getElementById('chatInput');
     const sendButton = document.getElementById('sendMessage');
-    
+
     if (languageSelect) languageSelect.disabled = disable;
     if (chatInput) chatInput.disabled = disable;
     if (sendButton) sendButton.disabled = disable;
@@ -64,66 +66,42 @@ function disableInputsDuringRetranslation(disable) {
 async function retranslateAnalysisResults(language) {
     try {
         document.getElementById('analysisStatus').style.display = 'block';
-        updateProgress(1, 2, translations[currentLanguage]?.translating || 'Translating analysis...', true);
-        disableInputsDuringRetranslation(true);
+        updateProgress(1, 2, translations[currentLanguage]?.translating || 'Translating...', true);
+        disableInputs(true);
 
-        console.log(`Sending /retranslate request for ${language}`);
         const response = await fetch('/retranslate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ language })
+            body: JSON.stringify({ language, user_id: localStorage.getItem('user_id') })
         });
 
         const data = await response.json();
-        console.log(`Retranslate response for ${language}:`, data);
-
-        if (!response.ok) {
-            console.error(`Retranslation failed with status ${response.status}: ${data.error}`);
-            throw new Error(data.error || `Retranslation failed: ${response.status}`);
-        }
+        if (!response.ok) throw new Error(data.error || 'Retranslation failed');
 
         if (data.status === 'success') {
             lastAnalysisResults = data;
             displayAnalysisResults(data);
             updateProgress(2, 2, translations[currentLanguage]?.translation_complete || 'Translation complete');
-            console.log(`Successfully retranslated to ${language}`);
             await restartChat(language);
         } else {
-            console.error(`Translation error: ${data.error}`);
-            showError(`${translations[currentLanguage]?.retranslation_error || 'Translation error'}: ${data.error}`);
-            if (data.analysis_results) {
-                lastAnalysisResults = data.analysis_results;
-                displayAnalysisResults(data.analysis_results);
-            } else if (lastAnalysisResults) {
-                displayAnalysisResults(lastAnalysisResults);
-            } else {
-                document.getElementById('results').style.display = 'none';
-            }
+            throw new Error(data.error || 'Retranslation failed');
         }
     } catch (error) {
-        console.error(`Retranslation error for ${language}:`, error);
         showError(`${translations[currentLanguage]?.retranslation_error || 'Translation error'}: ${error.message}`);
-        if (lastAnalysisResults) {
-            console.log('Falling back to last analysis results:', lastAnalysisResults);
-            displayAnalysisResults(lastAnalysisResults);
-        } else {
-            document.getElementById('results').style.display = 'none';
-        }
+        if (lastAnalysisResults) displayAnalysisResults(lastAnalysisResults);
     } finally {
         document.getElementById('analysisStatus').style.display = 'none';
-        disableInputsDuringRetranslation(false);
+        disableInputs(false);
     }
 }
 
 async function restartChat(language) {
-    console.log(`Restarting chat in language: ${language}`);
     await endChatSession();
-    if (lastAnalysisResults && lastAnalysisResults.document_text) {
+    if (lastAnalysisResults?.document_text) {
         await initializeChat(lastAnalysisResults.document_text);
         await updateChatLanguage(language);
     } else {
-        console.warn('No contract text available to restart chat');
-        showError(translations[currentLanguage]?.no_contract_text || 'No contract text available to restart chat.');
+        showError(translations[currentLanguage]?.no_contract_text || 'No contract text available.');
     }
 }
 
@@ -132,22 +110,13 @@ async function updateChatLanguage(language) {
         const response = await fetch('/api/chat/update_language', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ language })
+            body: JSON.stringify({ language, user_id: localStorage.getItem('user_id') })
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Chat language update failed: ${response.status}`);
-        }
-
         const data = await response.json();
-        if (data.status !== 'success') {
-            throw new Error(data.error || 'Chat language update failed');
-        }
-        console.log(`Chat language updated to ${language}`);
+        if (data.status !== 'success') throw new Error(data.error || 'Language update failed');
     } catch (error) {
-        console.error('Chat language update error:', error);
-        showError(`${translations[currentLanguage]?.chat_language_error || 'Chat language error'}: ${error.message}`);
+        showError(`${translations[currentLanguage]?.chat_language_error || 'Language error'}: ${error.message}`);
     }
 }
 
@@ -161,39 +130,32 @@ async function initializeChat(contractText) {
     if (sendButton) sendButton.disabled = true;
 
     if (!contractText) {
-        console.warn('No contract text for chat initialization');
-        showError(translations[currentLanguage]?.no_contract_text || 'No contract text available to start chat.');
+        showError(translations[currentLanguage]?.no_contract_text || 'No contract text.');
         return;
     }
 
     try {
-        console.log('Starting chat session with contract text:', contractText.substring(0, 50) + '...');
         const response = await fetch('/api/chat/start', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 contract_text: contractText,
-                language: currentLanguage
+                language: currentLanguage,
+                user_id: localStorage.getItem('user_id')
             })
         });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Chat start failed: ${response.status}`);
-        }
 
         const data = await response.json();
         if (data.status === 'success') {
             chatSessionId = data.session_id;
-            console.log('Chat session started:', chatSessionId);
             if (chatInput) chatInput.disabled = false;
             if (sendButton) sendButton.disabled = false;
+            fetchFrequentQuestions(); // Load questions after chat initialization
         } else {
             throw new Error(data.error || 'Chat initialization failed');
         }
     } catch (error) {
-        console.error('Chat initialization error:', error);
-        showError(`${translations[currentLanguage]?.chat_init_error || 'Chat initialization failed'}: ${error.message}`);
+        showError(`${translations[currentLanguage]?.chat_init_error || 'Chat init failed'}: ${error.message}`);
     }
 }
 
@@ -202,12 +164,12 @@ async function sendChatMessage() {
     const message = chatInput?.value.trim();
 
     if (!message) {
-        showError(translations[currentLanguage]?.error || 'Please enter a message.');
+        showError(translations[currentLanguage]?.error || 'Enter a message.');
         return;
     }
 
     if (!chatSessionId) {
-        showError(translations[currentLanguage]?.no_chat_session || 'No active chat session. Please analyze a contract.');
+        showError(translations[currentLanguage]?.no_chat_session || 'No active chat session.');
         return;
     }
 
@@ -225,26 +187,30 @@ async function sendChatMessage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 session_id: chatSessionId,
-                message: message
+                message,
+                user_id: localStorage.getItem('user_id')
             })
         });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Chat message failed: ${response.status}`);
-        }
 
         const data = await response.json();
         if (data.status === 'success') {
             removeTypingIndicator();
             displayChatMessage(data.response);
+            fetch('/auth/check')
+            .then(res => res.json())
+            .then(data => {
+                if (data.authenticated) {
+                    fetchFrequentQuestions();
+            } else {
+            window.location.href = '/auth/login';
+            }
+        });
         } else {
-            throw new Error(data.error || 'Failed to process message');
+            throw new Error(data.error || 'Message failed');
         }
     } catch (error) {
-        console.error('Chat error:', error);
         removeTypingIndicator();
-        displayChatMessage(`${translations[currentLanguage]?.chat_error || 'Error'}: ${error.message}`);
+        showError(`${translations[currentLanguage]?.chat_error || 'Chat error'}: ${error.message}`);
     } finally {
         chatInput.disabled = false;
         document.getElementById('sendMessage').disabled = false;
@@ -252,31 +218,19 @@ async function sendChatMessage() {
 }
 
 async function endChatSession() {
-    if (!chatSessionId) {
-        console.log('No chat session to end');
-        return;
-    }
+    if (!chatSessionId) return;
 
     try {
         const response = await fetch('/api/chat/end', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ session_id: chatSessionId })
+            body: JSON.stringify({ session_id: chatSessionId, user_id: localStorage.getItem('user_id') })
         });
 
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || `Chat end failed: ${response.status}`);
-        }
-
         const data = await response.json();
-        if (data.status === 'success') {
-            console.log('Chat session ended');
-        } else {
-            console.warn('Failed to end chat session:', data.error);
-        }
+        if (data.status !== 'success') console.warn('Failed to end session:', data.error);
     } catch (error) {
-        console.error('Error ending chat session:', error);
+        console.error('Error ending session:', error);
     } finally {
         chatSessionId = null;
         const chatInput = document.getElementById('chatInput');
@@ -288,104 +242,174 @@ async function endChatSession() {
 
 async function handleFileUpload(event) {
     event.preventDefault();
-    console.log('Handling file upload');
-
     const resultsContainer = document.getElementById('results');
-    if (!resultsContainer) {
-        console.error('Results container not found in DOM');
-        showError(translations[currentLanguage]?.error || 'UI error: Results container not found.');
-        return;
-    }
-    resultsContainer.style.display = 'none';
-
     const fileInput = document.getElementById('contractFile');
-    const languageSelect = document.getElementById('languageSelect');
+    const chatSection = document.getElementById('chatSection');
+    const frequentQuestionsSection = document.getElementById('frequentQuestionsSection');
 
-    if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
-        console.error('No file selected or file input not found');
-        showError(translations[currentLanguage]?.no_file_selected || 'Please select a file.');
-        return;
-    }
-
-    if (!languageSelect) {
-        console.error('Language select not found');
-        showError(translations[currentLanguage]?.error || 'UI error: Language select not found.');
+    if (!fileInput.files.length) {
+        showError(translations[currentLanguage]?.no_file_selected || 'Select a file.');
         return;
     }
 
     const formData = new FormData();
     formData.append('file', fileInput.files[0]);
-    formData.append('language', languageSelect.value);
+    formData.append('language', currentLanguage);
 
     const analysisStatus = document.getElementById('analysisStatus');
-    if (!analysisStatus) {
-        console.error('Analysis status element not found');
-        showError(translations[currentLanguage]?.error || 'UI error: Analysis status element not found.');
-        return;
-    }
     analysisStatus.style.display = 'block';
     updateProgress(1, 4, translations[currentLanguage]?.extracting_text || 'Extracting text...', true);
 
     try {
-        console.log('Sending /api/document/extract request');
         const extractResponse = await fetch('/api/document/extract', {
             method: 'POST',
             body: formData
         });
 
         const extractData = await extractResponse.json();
-        console.log('Extract response:', extractData);
+        if (extractData.status !== 'success') throw new Error(extractData.error || 'Extraction failed');
 
-        if (!extractResponse.ok || extractData.status !== 'success') {
-            console.error('Text extraction failed:', extractData.error);
-            throw new Error(extractData.error || 'Text extraction failed');
-        }
+        updateProgress(2, 4, translations[currentLanguage]?.analyzing_contract || 'Analyzing...', true);
 
-        if (!extractData.text || typeof extractData.text !== 'string') {
-            console.error('Invalid or empty extracted text:', extractData.text);
-            throw new Error('No text extracted from document');
-        }
-
-        updateProgress(2, 4, translations[currentLanguage]?.analyzing_contract || 'Analyzing contract...', true);
-
-        console.log('Sending /analyze request with text length:', extractData.text.length);
         const analyzeResponse = await fetch('/analyze', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 text: extractData.text,
-                language: languageSelect.value
+                language: currentLanguage,
+                user_id: localStorage.getItem('user_id')
             })
         });
 
         const analysisData = await analyzeResponse.json();
-        console.log('Analysis response:', analysisData);
-
-        if (!analyzeResponse.ok || analysisData.status !== 'success') {
-            console.error('Analysis failed:', analysisData.error);
-            throw new Error(analysisData.error || 'Analysis failed');
-        }
-
-        if (!analysisData.document_text || !analysisData.summary || !analysisData.shadow_analysis || !analysisData.evaluation) {
-            console.error('Incomplete analysis data:', analysisData);
-            throw new Error('Incomplete analysis data received');
-        }
+        if (analysisData.status !== 'success') throw new Error(analysisData.error || 'Analysis failed');
 
         lastAnalysisResults = analysisData;
         updateProgress(4, 4, translations[currentLanguage]?.analysis_complete || 'Analysis complete');
-        console.log('Calling displayAnalysisResults with data:', analysisData);
         displayAnalysisResults(analysisData);
         await initializeChat(analysisData.document_text);
-        console.log('Setting results container to visible');
+        if (chatSection) chatSection.style.display = 'block';
+        if (frequentQuestionsSection) frequentQuestionsSection.style.display = 'block';
+        fetchFrequentQuestions();
         resultsContainer.style.display = 'block';
-        resultsContainer.style.visibility = 'visible';
-        resultsContainer.style.opacity = '1';
     } catch (error) {
-        console.error('File upload error:', error);
         showError(`${translations[currentLanguage]?.error_occurred || 'Error'}: ${error.message}`);
         resultsContainer.style.display = 'none';
     } finally {
         analysisStatus.style.display = 'none';
+    }
+}
+
+async function fetchFrequentQuestions() {
+    if (!checkAuth()) return;
+
+    try {
+        const response = await fetch('/api/chat/frequent_questions', {
+            method: 'GET',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-User-ID': localStorage.getItem('user_id') || ''
+            }
+        });
+
+        // Avoid redirecting on 401/403; instead, handle gracefully
+        if (response.status === 401 || response.status === 403) {
+            console.warn('Authentication check failed, clearing local storage');
+            localStorage.removeItem('user_id');
+            if (window.location.pathname !== '/auth/login') {
+                window.location.href = '/auth/login';
+            }
+            return;
+        }
+
+        const data = await response.json();
+        if (data.status === 'success') {
+            displayFrequentQuestions(data.questions);
+        } else {
+            throw new Error(data.error || 'Failed to load frequent questions');
+        }
+    } catch (error) {
+        console.error('Error fetching frequent questions:', error);
+        // Display default questions instead of error to avoid breaking UI
+        displayFrequentQuestions([
+            {"question": "What are the termination clauses?", "response": "What are the termination clauses?", "count": 0},
+            {"question": "Is the non-compete clause enforceable?", "response": "Is the non-compete clause enforceable?", "count": 0},
+            {"question": "What are the salary details?", "response": "What are the salary details?", "count": 0}
+        ]);
+    }
+}
+
+function displayFrequentQuestions(questions) {
+    const container = document.getElementById('frequentQuestions');
+    if (!container) return;
+
+    container.innerHTML = questions.length ? questions.map(q => `
+        <button class="question-btn" onclick="useSuggestedQuestion('${q.response.replace(/'/g, "\\'")}')">
+            ${q.response} (${q.count})
+        </button>
+    `).join('') : `<p data-lang-key="no_questions">${translations[currentLanguage]?.no_questions || 'No frequent questions.'}</p>`;
+}
+
+function useSuggestedQuestion(question) {
+    const chatInput = document.getElementById('chatInput');
+    if (chatInput) {
+        chatInput.value = question;
+        chatInput.focus();
+    }
+}
+
+async function fetchChatHistory() {
+    if (!checkAuth()) return;
+
+    try {
+        const response = await fetch('/api/chat/history', {
+            method: 'GET',
+            headers: { 
+                'Content-Type': 'application/json',
+                'X-User-ID': localStorage.getItem('user_id') || ''
+            }
+        });
+
+        if (response.status === 401 || response.status === 403) {
+            localStorage.removeItem('user_id');
+            window.location.href = '/auth/login';
+            return;
+        }
+
+        const data = await response.json();
+        if (data.status === 'success') {
+            displayChatHistory(data.history);
+        } else {
+            showError(translations[currentLanguage]?.history_error || 'Failed to load history');
+        }
+    } catch (error) {
+        showError(translations[currentLanguage]?.history_error || 'Error loading history');
+    }
+}
+
+function displayChatHistory(history) {
+    const container = document.getElementById('chatHistory');
+    if (!container) return;
+
+    container.innerHTML = history.length ? history.map(h => `
+        <div class="history-item">
+            <p><strong data-lang-key="question">${translations[currentLanguage]?.question || 'Question'}:</strong> ${h.question}</p>
+            <p><strong data-lang-key="response">${translations[currentLanguage]?.response || 'Response'}:</strong> ${h.response}</p>
+            <p><small>${new Date(h.asked_at).toLocaleString()}</small></p>
+        </div>
+    `).join('') : `<p data-lang-key="no_history">${translations[currentLanguage]?.no_history || 'No chat history.'}</p>`;
+}
+
+function toggleChatHistory() {
+    const historyList = document.getElementById('chatHistory');
+    const toggleBtn = document.getElementById('toggleChatHistory');
+    if (historyList.style.display === 'none') {
+        fetchChatHistory();
+        historyList.style.display = 'block';
+        toggleBtn.textContent = translations[currentLanguage]?.hide_history || 'Hide History';
+    } else {
+        historyList.style.display = 'none';
+        toggleBtn.textContent = translations[currentLanguage]?.view_history || 'View History';
     }
 }
 
@@ -394,139 +418,178 @@ function updateProgress(step, total, message, showBlink = false) {
     const statusMessage = document.getElementById('statusMessage');
     const blinkingText = document.getElementById('blinkingText');
 
-    if (!progressFill || !statusMessage) {
-        console.error('Progress elements not found');
-        return;
-    }
+    if (!progressFill || !statusMessage) return;
 
     progressFill.style.width = `${(step / total) * 100}%`;
     statusMessage.textContent = message;
 
-    if (showBlink) {
-        if (!blinkingText) {
-            const blinkDiv = document.createElement('div');
-            blinkDiv.id = 'blinkingText';
-            blinkDiv.className = 'blinking-text';
-            blinkDiv.textContent = translations[currentLanguage]?.performing_analysis || 'Processing...';
-            statusMessage.insertAdjacentElement('afterend', blinkDiv);
-        } else {
-            blinkingText.textContent = translations[currentLanguage]?.performing_analysis || 'Processing...';
-        }
-    } else if (blinkingText) {
+    if (showBlink && !blinkingText) {
+        const blinkDiv = document.createElement('div');
+        blinkDiv.id = 'blinkingText';
+        blinkDiv.className = 'blinking-text';
+        blinkDiv.textContent = translations[currentLanguage]?.performing_analysis || 'Processing...';
+        statusMessage.insertAdjacentElement('afterend', blinkDiv);
+    } else if (!showBlink && blinkingText) {
         blinkingText.remove();
     }
 }
 
 function showError(message, isSuccess = false) {
     const errorDiv = document.getElementById('errorMessage');
-    if (!errorDiv) {
-        console.error('Error message element not found');
-        return;
-    }
+    if (!errorDiv) return;
+
     errorDiv.textContent = message;
-    errorDiv.className = `error-message ${isSuccess ? 'success-message' : ''}`;
+    errorDiv.className = `error-message${isSuccess ? ' success-message' : ''}`;
     errorDiv.style.display = 'block';
-    setTimeout(() => {
-        errorDiv.style.display = 'none';
-    }, 5000);
+    setTimeout(() => errorDiv.style.display = 'none', 5000);
 }
 
 function displayAnalysisResults(data) {
-    console.log('Received analysis data:', JSON.stringify(data, null, 2));
-
     const resultsContainer = document.getElementById('results');
-    if (!resultsContainer) {
-        console.error('Results container not found in DOM');
-        showError(translations[currentLanguage]?.error || 'UI error: Results container not found.');
-        return;
-    }
+    const scoresGrid = document.getElementById('scoresGrid');
+    const summaryDetails = document.getElementById('summaryDetails');
+    const shadowContent = document.getElementById('shadowContent');
+    const shadowScore = document.getElementById('shadowScore');
+    const evaluationContent = document.getElementById('evaluationContent');
+    const chatSection = document.getElementById('chatSection');
+    const frequentQuestionsSection = document.getElementById('frequentQuestionsSection');
+    const chatInput = document.getElementById('chatInput');
+    const sendMessage = document.getElementById('sendMessage');
 
     if (!data || data.status !== 'success') {
-        console.error('Invalid analysis data:', data);
-        showError(translations[currentLanguage]?.error_occurred || 'Failed to display results.');
-        resultsContainer.style.display = 'none';
+        showError('Analysis failed: ' + (data?.error || 'Unknown error'));
         return;
     }
 
-    lastAnalysisResults = data;
-
-    localStorage.setItem('analysisData', JSON.stringify({
-        contract_text: data.document_text,
-        shadow_analysis: data.shadow_analysis,
-        summary_analysis: data.summary
-    }));
-
-    const summaryContent = document.getElementById('summaryContent');
-    const scoresGrid = document.getElementById('scoresGrid');
-    const shadowContent = document.getElementById('shadowContent');
-
-    if (!summaryContent || !scoresGrid || !shadowContent) {
-        console.error('Analysis content elements not found:', { summaryContent, scoresGrid, shadowContent });
-        showError(translations[currentLanguage]?.error || 'UI error: Analysis content elements not found.');
-        resultsContainer.style.display = 'none';
-        return;
-    }
-
-    console.log('Clearing DOM elements');
-    summaryContent.innerHTML = '';
+    // Clear previous content
     scoresGrid.innerHTML = '';
+    summaryDetails.innerHTML = '';
     shadowContent.innerHTML = '';
+    shadowScore.innerHTML = '';
+    evaluationContent.innerHTML = '';
 
-    console.log('Rendering contract text');
-    summaryContent.innerHTML = `
-        <div class="summary-section">
-            <h3 data-lang-key="contract_text">${translations[currentLanguage]?.contract_text || 'Contract Text'}</h3>
-            <pre class="contract-text">${(data.document_text || '').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')}</pre>
-        </div>
-    `;
+    // Render section scores
+    if (data.summary?.structured_analysis) {
+        Object.entries(data.summary.structured_analysis).forEach(([key, value]) => {
+            if (key !== 'overall_score' && value.content) {
+                const score = value.score || 'N/A';
+                scoresGrid.innerHTML += `
+                    <div class="score-card">
+                        <h4>${key.replace(/_/g, ' ').toUpperCase()}</h4>
+                        <p>Score: ${score}/10</p>
+                        <p>${value.content}</p>
+                    </div>
+                `;
+            }
+        });
+    }
 
-    console.log('Displaying contract summary:', data.summary);
-    displayContractSummary(data.summary || {});
-    console.log('Displaying scores grid:', data.summary?.structured_analysis);
-    displayScoresGrid(data.summary?.structured_analysis || {});
-    console.log('Displaying shadow analysis:', data.shadow_analysis);
-    displayShadowAnalysis({ content: data.shadow_analysis || '' });
-    console.log('Updating score badges:', data.evaluation);
-    updateScoreBadges(data.evaluation || {});
-    updateLanguageStrings();
-    updateMarksTranslations();
+    // Render summary details
+    if (data.summary?.summary) {
+        summaryDetails.innerHTML = `
+            <h4>Executive Summary</h4>
+            <p>${data.summary.summary.executive_summary || 'No executive summary available'}</p>
+            <h4>Key Points</h4>
+            <ul>${data.summary.summary.key_points ? `<li>${data.summary.summary.key_points.split('. ').filter(p => p).join('</li><li>')}</li>` : '<li>No key points</li>'}</ul>
+            <h4>Potential Issues</h4>
+            <p>${data.summary.summary.potential_issues || 'No issues identified'}</p>
+            <h4>Recommendations</h4>
+            <p>${data.summary.summary.recommendations || 'No recommendations'}</p>
+        `;
+    }
 
-    console.log('Setting results display to block');
+    // Render shadow analysis
+    if (data.shadow_analysis) {
+        shadowScore.innerHTML = `Accuracy: ${data.shadow_analysis.overall_score ? data.shadow_analysis.overall_score * 10 + '%' : 'N/A'}`;
+        let topicsHtml = '';
+        if (data.shadow_analysis.topics?.length) {
+            topicsHtml = data.shadow_analysis.topics.map(topic => `
+                <div class="topic-details">
+                    <h4>${topic.topic || 'Unnamed Topic'}</h4>
+                    <p><strong>Problems:</strong> ${topic.problems || 'None'}</p>
+                    <p><strong>Implications:</strong> ${topic.implications || 'None'}</p>
+                    <p><strong>Solutions:</strong> ${topic.solutions || 'None'}</p>
+                    <p><strong>Score:</strong> ${topic.score || 'N/A'}/10</p>
+                </div>
+            `).join('');
+        }
+        shadowContent.innerHTML = `
+            ${topicsHtml || '<p>No topics analyzed</p>'}
+            <h4>Summary</h4>
+            <p>${data.shadow_analysis.summary || 'No summary available'}</p>
+        `;
+    }
+
+    // Render evaluation
+    if (data.evaluation) {
+        let areasHtml = '';
+        if (data.evaluation.areas) {
+            areasHtml = Object.entries(data.evaluation.areas).map(([area, details]) => `
+                <div class="area-details">
+                    <h4>${area.replace(/_/g, ' ').toUpperCase()}</h4>
+                    <p><strong>Score:</strong> ${details.score || 'N/A'}/10</p>
+                    <p><strong>Issues:</strong> ${details.issues?.length ? details.issues.join('; ') : 'None'}</p>
+                    <p><strong>Recommendations:</strong> ${details.recommendations?.length ? details.recommendations.join('; ') : 'None'}</p>
+                </div>
+            `).join('');
+        }
+        evaluationContent.innerHTML = `
+            <p><strong>Overall Score:</strong> ${data.evaluation.overall_score || 'N/A'}/10</p>
+            <p><strong>Clarity:</strong> ${data.evaluation.scores?.clarity || 'N/A'}/10</p>
+            <p><strong>Completeness:</strong> ${data.evaluation.scores?.completeness || 'N/A'}/10</p>
+            <p><strong>Risk Level:</strong> ${data.evaluation.scores?.risk_level || 'N/A'}/10</p>
+            <p><strong>Fairness:</strong> ${data.evaluation.scores?.fairness || 'N/A'}/10</p>
+            ${areasHtml}
+            <h4>Recommendations</h4>
+            <p>${data.evaluation.recommendations?.length ? data.evaluation.recommendations.join('; ') : 'No recommendations'}</p>
+        `;
+    }
+
+    // Enable chat and questions
+    chatSection.style.display = 'block';
+    frequentQuestionsSection.style.display = 'block';
+    chatInput.disabled = false;
+    sendMessage.disabled = false;
+
     resultsContainer.style.display = 'block';
-    resultsContainer.style.visibility = 'visible';
-    resultsContainer.style.opacity = '1';
 }
 
-function displayContractSummary(summary) {
-    console.log('Displaying summary:', summary);
+document.querySelectorAll('.tab-button').forEach(button => {
+    button.addEventListener('click', () => {
+        // Remove active class from all buttons
+        document.querySelectorAll('.tab-button').forEach(btn => btn.classList.remove('active'));
+        // Hide all tab contents
+        document.querySelectorAll('.tab-content').forEach(content => content.style.display = 'none');
+        // Activate clicked button
+        button.classList.add('active');
+        // Show corresponding tab content
+        const tabId = button.getAttribute('data-tab') + 'Tab';
+        document.getElementById(tabId).style.display = 'block';
+    });
+});
 
-    const keyPoints = typeof summary?.key_points === 'string' && summary.key_points.trim()
-        ? summary.key_points.split('\n').filter(p => p.trim())
-        : [];
-    const potentialIssues = typeof summary?.potential_issues === 'string' && summary.potential_issues.trim()
-        ? summary.potential_issues.split('\n').filter(p => p.trim())
-        : [];
-    const recommendations = typeof summary?.recommendations === 'string' && summary.recommendations.trim()
-        ? summary.recommendations.split('\n').filter(p => p.trim())
-        : [];
+function displayContractSummary(summary) {
+    const keyPoints = summary?.key_points?.split('\n').filter(p => p.trim()) || [];
+    const potentialIssues = summary?.potential_issues?.split('\n').filter(p => p.trim()) || [];
+    const recommendations = summary?.recommendations?.split('\n').filter(p => p.trim()) || [];
 
     const summaryContent = document.getElementById('summaryContent');
-    summaryContent.innerHTML += `
+    summaryContent.innerHTML = `
         <div class="summary-section">
             <h3 data-lang-key="executive_summary">${translations[currentLanguage]?.executive_summary || 'Executive Summary'}</h3>
-            <p>${(summary?.executive_summary || translations[currentLanguage]?.no_summary || 'No summary available').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>
+            <p>${(summary?.executive_summary || translations[currentLanguage]?.no_summary || 'No summary available').replace(/</g, '')}</p>
             <div class="summary-details">
                 <h4 data-lang-key="key_points">${translations[currentLanguage]?.key_points || 'Key Points'}</h4>
                 <ul class="data-list">
-                    ${keyPoints.length > 0 ? keyPoints.map(point => `<li>${point.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>`).join('') : `<li>${translations[currentLanguage]?.no_key_points || 'No key points available'}</li>`}
+                    ${keyPoints.length ? keyPoints.map(point => `<li>${point.replace(/</g, '')}</li>`).join('') : `<li>${translations[currentLanguage]?.no_key_points || 'No key points.'}</li>`}
                 </ul>
                 <h4 data-lang-key="potential_issues">${translations[currentLanguage]?.potential_issues || 'Potential Issues'}</h4>
                 <ul class="data-list">
-                    ${potentialIssues.length > 0 ? potentialIssues.map(issue => `<li>${issue.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>`).join('') : `<li>${translations[currentLanguage]?.no_issues || 'No issues identified'}</li>`}
+                    ${potentialIssues.length ? potentialIssues.map(issue => `<li>${issue.replace(/</g, '')}</li>`).join('') : `<li>${translations[currentLanguage]?.no_issues || 'No issues.'}</li>`}
                 </ul>
                 <h4 data-lang-key="recommendations">${translations[currentLanguage]?.recommendations || 'Recommendations'}</h4>
                 <ul class="data-list">
-                    ${recommendations.length > 0 ? recommendations.map(rec => `<li>${rec.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>`).join('') : `<li>${translations[currentLanguage]?.no_recommendations || 'No recommendations provided'}</li>`}
+                    ${recommendations.length ? recommendations.map(rec => `<li>${rec.replace(/</g, '')}</li>`).join('') : `<li>${translations[currentLanguage]?.no_recommendations || 'No recommendations'}</li>`}
                 </ul>
             </div>
         </div>
@@ -534,8 +597,6 @@ function displayContractSummary(summary) {
 }
 
 function displayScoresGrid(analysis) {
-    console.log('Rendering scores grid with analysis:', analysis);
-
     const scoresHtml = Object.entries(analysis || {})
         .filter(([key]) => key !== 'overall_score')
         .map(([key, value]) => {
@@ -548,26 +609,19 @@ function displayScoresGrid(analysis) {
                             <span class="score-badge">${value?.score || 0}/10</span>
                         </div>
                     </div>
-                    ${value?.content ? `<div class="score-content"><p>${value.content.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p></div>` : ''}
+                    ${value?.content ? `<div class="score-content"><p>${value.content.replace(/</g, '')}</p></div>` : ''}
                 </div>
             `;
-        })
-        .join('');
+        }).join('');
 
     const scoresGrid = document.getElementById('scoresGrid');
-    if (scoresGrid) {
-        scoresGrid.innerHTML = scoresHtml;
-    } else {
-        console.error('Scores grid element not found');
-    }
+    if (scoresGrid) scoresGrid.innerHTML = scoresHtml;
 }
 
 function displayShadowAnalysis(shadowData) {
     const shadowContent = document.getElementById('shadowContent');
-    if (!shadowContent) {
-        console.error('Shadow content element not found');
-        return;
-    }
+    if (!shadowContent) return;
+
     shadowContent.innerHTML = `
         <div class="shadow-section">
             <div class="shadow-text">
@@ -578,9 +632,10 @@ function displayShadowAnalysis(shadowData) {
 }
 
 function formatShadowContent(content) {
-    if (!content) return '<p>No analysis available</p>';
+    if (!content) return `<p>${translations[currentLanguage]?.no_analysis || 'No analysis available'}</p>`;
     return content
-        .replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/</g, '')
+        .replace(/>/g, '')
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
         .replace(/^### (.*)$/gm, '<h3>$1</h3>')
         .replace(/^#### (.*)$/gm, '<h4>$1</h4>')
@@ -596,10 +651,7 @@ function formatShadowContent(content) {
 function updateScoreBadges(evaluation) {
     const summaryScore = document.getElementById('summaryScore');
     const shadowScore = document.getElementById('shadowScore');
-    if (!summaryScore || !shadowScore) {
-        console.error('Score badge elements not found');
-        return;
-    }
+    if (!summaryScore || !shadowScore) return;
 
     const overallScore = (evaluation?.overall_score || 0) * 10;
     summaryScore.innerHTML = `
@@ -614,7 +666,7 @@ function updateScoreBadges(evaluation) {
 
 function getScoreClass(score) {
     if (!score || score <= 3) return 'low-score';
-    if (score >= 8) return 'high-score';
+    if (score >= 3) return 'high-score';
     return '';
 }
 
@@ -624,30 +676,23 @@ function formatTitle(key) {
 
 function displayChatMessage(message, isUser = false) {
     const chatMessages = document.getElementById('chatMessages');
-    if (!chatMessages) {
-        console.error('Chat messages element not found');
-        return;
-    }
+    if (!chatMessages) return;
 
     const messageDiv = document.createElement('div');
     messageDiv.className = `chat-message ${isUser ? 'user-message' : 'bot-message'}`;
-    
     const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    
-    const formattedMessage = message
-        .split('\n\n')
-        .map(para => {
-            if (para.includes('\n- ')) {
-                const items = para.split('\n- ').filter(item => item.trim());
-                const listItems = items.map((item, index) => {
-                    const text = index === 0 ? item : item.replace(/^- /, '');
-                    return text.trim() ? `<li>${text.trim()}</li>` : '';
-                }).join('');
-                return `<ul>${listItems}</ul>`;
-            }
-            return `<p>${para.trim()}</p>`;
-        })
-        .join('');
+
+    // Parse Markdown-like formatting
+    let formattedMessage = message
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>') // Bold
+        .replace(/^\* (.*)$/gm, '<li>$1</li>') // List items
+        .replace(/\n\n/g, '</p><p>') // Paragraphs
+        .replace(/\n/g, '<br>'); // Line breaks
+
+    // Wrap list items in <ul>
+    formattedMessage = formattedMessage.replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>');
+    // Ensure paragraphs are properly formatted
+    formattedMessage = `<p>${formattedMessage.replace(/<p>\s*<\/p>/g, '')}</p>`;
 
     messageDiv.innerHTML = `
         <div class="message-content">
@@ -660,15 +705,14 @@ function displayChatMessage(message, isUser = false) {
             </div>
         </div>
     `;
-    
+
     messageDiv.style.opacity = '0';
     chatMessages.appendChild(messageDiv);
-    
     setTimeout(() => {
         messageDiv.style.opacity = '1';
         messageDiv.style.transform = 'translateY(0)';
     }, 10);
-    
+
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
@@ -695,297 +739,7 @@ function displayTypingIndicator() {
 
 function removeTypingIndicator() {
     const typingIndicator = document.getElementById('typingIndicator');
-    if (typingIndicator) {
-        typingIndicator.remove();
-    }
-}
-
-function switchMode(mode) {
-    const contractSection = document.getElementById('contractSection');
-    const studentSection = document.getElementById('studentSection');
-    const contractBtn = document.getElementById('contractModeBtn');
-    const studentBtn = document.getElementById('studentModeBtn');
-
-    if (!contractSection || !studentSection || !contractBtn || !studentBtn) {
-        console.error('Mode switch elements not found');
-        return;
-    }
-
-    localStorage.setItem('currentMode', mode);
-    currentMode = mode;
-
-    if (mode === 'contract') {
-        contractSection.style.display = 'block';
-        studentSection.style.display = 'none';
-        contractBtn.classList.add('active');
-        studentBtn.classList.remove('active');
-    } else {
-        contractSection.style.display = 'none';
-        studentSection.style.display = 'block';
-        contractBtn.classList.remove('active');
-        studentBtn.classList.add('active');
-    }
-}
-
-async function fetchUniversitySuggestions(query) {
-    try {
-        const response = await fetch(`http://universities.hipolabs.com/search?name=${encodeURIComponent(query)}`);
-        if (!response.ok) throw new Error('Failed to fetch universities');
-        const data = await response.json();
-        return data.slice(0, 5).map(uni => uni.name);
-    } catch (error) {
-        console.error('University suggestion error:', error);
-        return [];
-    }
-}
-
-async function fetchKeywordSuggestions(category) {
-    const suggestions = {
-        working_student: ['part-time work', 'student jobs', 'work regulations'],
-        housing: ['dormitory', 'student accommodation', 'rent costs'],
-        research: ['research programs', 'thesis opportunities', 'labs'],
-        internship: ['internship programs', 'placements', 'traineeships'],
-        job_offers: ['career fairs', 'job postings', 'employment'],
-        scholarships: ['financial aid', 'grants', 'bursaries'],
-        visas: ['student visa', 'residence permit', 'immigration'],
-        custom: ['enter keywords', 'specific terms', 'custom query']
-    };
-    return suggestions[category] || [];
-}
-
-function displaySuggestions(suggestions, containerId, selectCallback) {
-    const container = document.getElementById(containerId);
-    if (!container) {
-        console.error(`Suggestion container ${containerId} not found`);
-        return;
-    }
-
-    container.innerHTML = suggestions.length ? suggestions.map(item => `
-        <div class="suggestion-item" role="button" tabindex="0">${item}</div>
-    `).join('') : '<div class="suggestion-item no-suggestions">No suggestions</div>';
-
-    container.querySelectorAll('.suggestion-item:not(.no-suggestions)').forEach(item => {
-        item.addEventListener('click', () => {
-            selectCallback(item.textContent);
-            container.innerHTML = '';
-        });
-        item.addEventListener('keypress', e => {
-            if (e.key === 'Enter') {
-                selectCallback(item.textContent);
-                container.innerHTML = '';
-            }
-        });
-    });
-}
-
-let isSearching = false;
-async function handleStudentSearch(event) {
-    event.preventDefault();
-    console.log('Student search form submitted at', new Date().toISOString());
-
-    if (isSearching) {
-        console.log('Search in progress, ignoring new submission');
-        return;
-    }
-    isSearching = true;
-
-    const studentForm = document.getElementById('studentSearchForm');
-    const universityInput = document.getElementById('universityInput');
-    const category = document.querySelector('input[name="category"]:checked')?.value;
-    const customKeywords = document.getElementById('customKeywords')?.value.trim();
-    const searchButton = document.querySelector('#studentSearchForm button[type="submit"]');
-
-    if (!studentForm || !universityInput) {
-        console.error('Student search form or university input not found');
-        showError(translations[currentLanguage]?.error || 'UI error: Form elements not found.');
-        isSearching = false;
-        return;
-    }
-
-    if (!universityInput.value.trim()) {
-        showError(translations[currentLanguage]?.no_university || 'Please enter a university name.');
-        universityInput.focus();
-        isSearching = false;
-        return;
-    }
-
-    if (category === 'custom' && !customKeywords) {
-        showError(translations[currentLanguage]?.no_keywords || 'Please enter custom keywords.');
-        document.getElementById('customKeywords').focus();
-        isSearching = false;
-        return;
-    }
-
-    if (searchButton) {
-        searchButton.disabled = true;
-    }
-
-    try {
-        console.log(`Sending student search: university=${universityInput.value}, category=${category}, keywords=${customKeywords || 'none'}`);
-        const loadingSpinner = document.getElementById('loadingSpinner');
-        if (loadingSpinner) loadingSpinner.style.display = 'flex';
-        document.getElementById('searchResults').innerHTML = '';
-
-        const response = await fetch('/api/student/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                university: universityInput.value,
-                category: category,
-                keywords: category === 'custom' ? customKeywords.split(',').map(kw => kw.trim()).filter(kw => kw) : undefined,
-                language: currentLanguage
-            })
-        });
-
-        console.log('Search API response status:', response.status);
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Search failed');
-        }
-
-        const data = await response.json();
-        console.log('Student search results:', data);
-        displayStudentResults(data);
-    } catch (error) {
-        console.error('Student search error:', error);
-        showError(`${translations[currentLanguage]?.error_occurred || 'Search failed'}: ${error.message}`);
-        document.getElementById('searchResults').innerHTML = `<p class="error-message">${error.message}</p>`;
-    } finally {
-        const loadingSpinner = document.getElementById('loadingSpinner');
-        if (loadingSpinner) loadingSpinner.style.display = 'none';
-        if (searchButton) searchButton.disabled = false;
-        studentForm.reset();
-        document.getElementById('customKeywordsContainer').style.display = category === 'custom' ? 'block' : 'none';
-        console.log('Form reset and search state cleared');
-        isSearching = false;
-    }
-}
-
-function displayStudentResults(data) {
-    const resultsDiv = document.getElementById('searchResults');
-    if (!resultsDiv) {
-        console.error('Search results container not found');
-        return;
-    }
-
-    resultsDiv.style.display = 'block';
-    resultsDiv.innerHTML = '';
-
-    if (data.status === 'error') {
-        resultsDiv.innerHTML = `<p class="error-message">${translations[currentLanguage]?.error_occurred || 'Error'}: ${data.error}</p>`;
-        return;
-    }
-
-    const { university, category, summary, results, total_results } = data;
-    const categoryName = category === 'custom' 
-        ? (translations[currentLanguage]?.category_custom || 'Custom Search')
-        : (translations[currentLanguage]?.[`category_${category}`] || formatTitle(category));
-
-    resultsDiv.innerHTML = `
-        <div class="search-results">
-            <h3 data-lang-key="search_results">${translations[currentLanguage]?.search_results || 'Search Results'}</h3>
-            <p data-lang-key="results_for">${translations[currentLanguage]?.results_for || 'Results for'} ${categoryName} at ${university}</p>
-            <p data-lang-key="found_results">${translations[currentLanguage]?.found_results || 'Found'} ${total_results} ${translations[currentLanguage]?.relevant_results || 'relevant results'}</p>
-            <p><strong>${translations[currentLanguage]?.summary || 'Summary'}:</strong> ${summary.recommendation || 'No summary provided'}</p>
-            <div class="sort-controls">
-                <label for="sortResults">${translations[currentLanguage]?.sort_by || 'Sort by'}:</label>
-                <select id="sortResults" aria-label="Sort search results">
-                    <option value="relevance">${translations[currentLanguage]?.sort_relevance || 'Relevance'}</option>
-                    <option value="title">${translations[currentLanguage]?.sort_title || 'Title'}</option>
-                </select>
-            </div>
-        </div>
-    `;
-
-    if (total_results === 0) {
-        const guessedDomain = university.toLowerCase().replace(/[\s\W]+/g, '-') + '.edu';
-        resultsDiv.innerHTML += `
-            <p>${translations[currentLanguage]?.no_results || 'No results found for'} ${categoryName}. 
-            ${translations[currentLanguage]?.try_another || 'Try another category or visit'} 
-            <a href="https://${guessedDomain}" target="_blank">${university} ${translations[currentLanguage]?.website || 'website'}</a>.</p>
-        `;
-        return;
-    }
-
-    const sortedResults = [...results];
-    const sortSelect = resultsDiv.querySelector('#sortResults');
-    sortSelect.addEventListener('change', () => {
-        console.log('Sorting results by:', sortSelect.value);
-        const sortBy = sortSelect.value;
-        sortedResults.sort((a, b) => {
-            if (sortBy === 'relevance') {
-                return b.relevance_score - a.relevance_score;
-            }
-            if (sortBy === 'title') {
-                return a.title.localeCompare(b.title);
-            }
-            return 0;
-        });
-        displaySortedResults(sortedResults, resultsDiv, university, categoryName);
-    });
-
-    displaySortedResults(sortedResults, resultsDiv, university, categoryName);
-    updateLanguageStrings();
-}
-
-function displaySortedResults(results, resultsDiv, university, categoryName) {
-    const resultsList = results.map((result, index) => `
-        <div class="search-result card" data-result-id="${index}">
-            <h4 class="result-title">
-                <a href="${result.url}" target="_blank">${result.title}</a>
-            </h4>
-            <p class="result-summary">${result.content_summary || result.content.substring(0, 200)}...</p>
-            <ul class="key-points">
-                ${result.key_points?.map(point => `<li>${point}</li>`).join('') || '<li>No key points available</li>'}
-            </ul>
-            <div class="result-meta">
-                <div class="keywords">
-                    ${(result.matched_keywords || []).map(kw => `<span class="keyword-tag">${kw}</span>`).join('')}
-                </div>
-                <div class="relevance">
-                    <span class="relevance-score">
-                        ${translations[currentLanguage]?.relevance_score || 'Relevance'}: ${result.relevance_score.toFixed(2)}
-                    </span>
-                </div>
-            </div>
-            <div class="result-actions">
-                <button class="btn action-btn ask-btn" data-title="${result.title}" data-lang-key="ask_about">${translations[currentLanguage]?.ask_about || 'Ask About This'}</button>
-                <button class="btn action-btn copy-btn" data-url="${result.url}" data-lang-key="copy_url">${translations[currentLanguage]?.copy_url || 'Copy URL'}</button>
-            </div>
-        </div>
-    `).join('');
-
-    const existingSummary = resultsDiv.querySelector('.search-results');
-    resultsDiv.innerHTML = '';
-    if (existingSummary) {
-        resultsDiv.appendChild(existingSummary);
-    }
-    resultsDiv.innerHTML += resultsList;
-
-    resultsDiv.querySelectorAll('.ask-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            console.log('Ask button clicked for:', btn.getAttribute('data-title'));
-            const title = btn.getAttribute('data-title');
-            switchMode('contract');
-            const chatInput = document.getElementById('chatInput');
-            chatInput.value = `Tell me more about ${title}`;
-            chatInput.focus();
-        });
-    });
-
-    resultsDiv.querySelectorAll('.copy-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            console.log('Copy URL button clicked:', btn.getAttribute('data-url'));
-            const url = btn.getAttribute('data-url');
-            navigator.clipboard.writeText(url).then(() => {
-                showError(translations[currentLanguage]?.url_copied || 'URL copied to clipboard!', true);
-            }).catch(err => {
-                console.error('Copy URL error:', err);
-                showError(translations[currentLanguage]?.error || 'Failed to copy URL.');
-            });
-        });
-    });
+    if (typingIndicator) typingIndicator.remove();
 }
 
 function autoResizeTextarea() {
@@ -997,11 +751,35 @@ function autoResizeTextarea() {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const form = document.getElementById('uploadForm');
-    if (form) {
-        form.addEventListener('submit', handleFileUpload);
-        console.log('Form submission handler attached');
+    // Set user_id after login
+    if (window.location.pathname === '/' && !localStorage.getItem('user_id')) {
+        fetch('/auth/check')
+            .then(res => res.json())
+            .then(data => {
+                if (data.authenticated) {
+                    localStorage.setItem('user_id', data.user_id || 'authenticated_user');
+                    // Check if analysis is complete
+                    fetch('/api/check_analysis_status', {
+                        headers: { 'X-User-ID': localStorage.getItem('user_id') }
+                    })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.analysis_complete) {
+                                fetchFrequentQuestions();
+                                const chatSection = document.getElementById('chatSection');
+                                const frequentQuestionsSection = document.getElementById('frequentQuestionsSection');
+                                if (chatSection) chatSection.style.display = 'block';
+                                if (frequentQuestionsSection) frequentQuestionsSection.style.display = 'block';
+                            }
+                        });
+                } else if (window.location.pathname !== '/auth/login') {
+                    window.location.href = '/auth/login';
+                }
+            });
     }
+
+    const form = document.getElementById('uploadForm');
+    if (form) form.addEventListener('submit', handleFileUpload);
 
     const chatInput = document.getElementById('chatInput');
     const sendButton = document.getElementById('sendMessage');
@@ -1014,75 +792,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         chatInput.addEventListener('input', autoResizeTextarea);
     }
-    if (sendButton) {
-        sendButton.addEventListener('click', sendChatMessage);
-    }
-
-    const contractBtn = document.getElementById('contractModeBtn');
-    const studentBtn = document.getElementById('studentModeBtn');
-    if (contractBtn && studentBtn) {
-        contractBtn.addEventListener('click', () => switchMode('contract'));
-        studentBtn.addEventListener('click', () => switchMode('student'));
-    }
-
-    const savedMode = localStorage.getItem('currentMode') || 'contract';
-    switchMode(savedMode);
-
-    const savedLanguage = localStorage.getItem('preferredLanguage');
-    if (savedLanguage) {
-        currentLanguage = savedLanguage;
-        document.getElementById('languageSelect').value = savedLanguage;
-        updateLanguageStrings();
-        updateMarksTranslations();
-    }
-
-    const universityInput = document.getElementById('universityInput');
-    if (universityInput) {
-        universityInput.addEventListener('input', () => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(async () => {
-                const query = universityInput.value.trim();
-                if (query.length >= 3) {
-                    const suggestions = await fetchUniversitySuggestions(query);
-                    displaySuggestions(suggestions, 'universitySuggestions', text => {
-                        universityInput.value = text;
-                    });
-                } else {
-                    document.getElementById('universitySuggestions').innerHTML = '';
-                }
-            }, 300);
-        });
-    }
-
-    const customInput = document.getElementById('customKeywords');
-    if (customInput) {
-        customInput.addEventListener('input', () => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(async () => {
-                const category = document.querySelector('input[name="category"]:checked')?.value;
-                if (category === 'custom') {
-                    const suggestions = await fetchKeywordSuggestions(category);
-                    displaySuggestions(suggestions, 'keywordSuggestions', text => {
-                        customInput.value = text;
-                    });
-                }
-            }, 300);
-        });
-    }
-
-    const categoryInputs = document.querySelectorAll('input[name="category"]');
-    categoryInputs.forEach(input => {
-        input.addEventListener('change', () => {
-            const customContainer = document.getElementById('customKeywordsContainer');
-            customContainer.style.display = input.value === 'custom' ? 'block' : 'none';
-            document.getElementById('keywordSuggestions').innerHTML = '';
-        });
-    });
+    if (sendButton) sendButton.addEventListener('click', sendChatMessage);
 
     const languageSelect = document.getElementById('languageSelect');
     if (languageSelect) {
+        languageSelect.value = currentLanguage;
         languageSelect.addEventListener('change', changeLanguage);
     }
 
+    const toggleHistoryBtn = document.getElementById('toggleChatHistory');
+    if (toggleHistoryBtn) toggleHistoryBtn.addEventListener('click', toggleChatHistory);
+
+    document.querySelectorAll('a[href^="/auth/logout"]').forEach(link => {
+        link.addEventListener('click', e => {
+            e.preventDefault();
+            localStorage.removeItem('user_id');
+            window.location.href = '/auth/logout';
+        });
+    });
+
     window.addEventListener('beforeunload', endChatSession);
+
+    updateLanguageStrings();
+    updateMarksTranslations();
 });
+

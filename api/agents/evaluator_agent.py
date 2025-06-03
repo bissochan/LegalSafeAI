@@ -1,52 +1,14 @@
-import requests
-import json
-from dotenv import load_dotenv
-import os
+# api/agents/evaluator_agent.py
 import logging
 import re
 from typing import Dict, Any, List, Optional
 
-# Configura il logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class EvaluatorAgent:
     def __init__(self):
-        # Carica variabili d'ambiente
-        load_dotenv()
-        self.api_key = os.getenv("OPENROUTER_API_KEY")
-        if not self.api_key:
-            raise ValueError("OPENROUTER_API_KEY not found in environment variables")
-
-    def clean_json_response(self, response_text: str) -> str:
-        """Tenta di estrarre un JSON valido da una risposta potenzialmente malformata."""
-        if not response_text or response_text.isspace():
-            logger.warning("Response text is empty or contains only whitespace")
-            return "{}"  # Restituisci un JSON vuoto come fallback
-
-        # Rimuove eventuali blocchi di codice markdown (es. ```json ... ```)
-        response_text = re.sub(r'^```json\n|\n```$', '', response_text, flags=re.MULTILINE)
-        
-        # Rimuove spazi o caratteri non validi iniziali/finali
-        response_text = response_text.strip()
-        
-        # Sostituisce caratteri di controllo non validi (es. \n, \t) all'interno delle stringhe
-        def escape_control_chars(match):
-            text = match.group(0)
-            return text.replace('\n', '\\n').replace('\t', '\\t').replace('\r', '\\r')
-        
-        # Applica la sostituzione solo alle stringhe tra virgolette
-        response_text = re.sub(r'"[^"]*"', escape_control_chars, response_text)
-        
-        # Cerca un oggetto JSON valido
-        json_pattern = r'\{.*\}'
-        match = re.search(json_pattern, response_text, re.DOTALL)
-        if match:
-            return match.group(0)
-        
-        # Se non trova un JSON, restituisci un JSON vuoto
-        logger.warning(f"Could not extract valid JSON from response: {response_text}")
-        return "{}"
+        pass  # No API key needed for aggregation
 
     def evaluate(
         self,
@@ -55,49 +17,82 @@ class EvaluatorAgent:
         summary: Dict[str, Any],
         focal_points: Optional[List[str]] = None
     ) -> Dict[str, Any]:
-        """
-        Evaluate contract with analysis data and optional focal points
-        
-        Args:
-            contract_text: Raw contract text
-            shadow_analysis: Deep analysis results
-            summary: Contract summary
-            focal_points: Optional list of areas to focus on
-        """
+        """Evaluate contract with analysis data and optional focal points."""
         try:
-            # Default evaluation areas
             evaluation_areas = {
-                'liability': 0,
-                'work_hours': 0,
-                'compensation': 0,
-                'termination': 0,
-                'confidentiality': 0,
-                'non_compete': 0,
-                'benefits': 0,
-                'intellectual_property': 0,
-                'dispute_resolution': 0
+                'liability': {'score': 0, 'issues': [], 'recommendations': []},
+                'work_hours': {'score': 0, 'issues': [], 'recommendations': []},
+                'compensation': {'score': 0, 'issues': [], 'recommendations': []},
+                'termination': {'score': 0, 'issues': [], 'recommendations': []},
+                'confidentiality': {'score': 0, 'issues': [], 'recommendations': []},
+                'non_compete': {'score': 0, 'issues': [], 'recommendations': []},
+                'benefits': {'score': 0, 'issues': [], 'recommendations': []},
+                'intellectual_property': {'score': 0, 'issues': [], 'recommendations': []},
+                'dispute_resolution': {'score': 0, 'issues': [], 'recommendations': []}
             }
 
-            # Prioritize focal points if provided
             if focal_points:
                 for point in focal_points:
                     if point not in evaluation_areas:
-                        evaluation_areas[point] = 0
+                        evaluation_areas[point] = {'score': 0, 'issues': [], 'recommendations': []}
 
-            # For now, return a placeholder evaluation
+            # Process shadow analysis
+            if shadow_analysis.get('topics'):
+                for topic_data in shadow_analysis['topics']:
+                    topic = topic_data.get('topic', '').lower()
+                    score = topic_data.get('score', 0) or 0
+                    problems = topic_data.get('problems', '')
+                    solutions = topic_data.get('solutions', '')
+
+                    for area in evaluation_areas:
+                        if area in topic or topic in area:
+                            evaluation_areas[area]['score'] = max(evaluation_areas[area]['score'], score)
+                            if problems:
+                                evaluation_areas[area]['issues'].append(problems)
+                            if solutions:
+                                evaluation_areas[area]['recommendations'].append(solutions)
+
+            # Process summary
+            if summary.get('structured_analysis'):
+                for key, value in summary['structured_analysis'].items():
+                    if key != 'overall_score' and key in evaluation_areas:
+                        score = value.get('score', 0) or 0
+                        content = value.get('content', '')
+                        evaluation_areas[key]['score'] = max(evaluation_areas[key]['score'], score)
+                        if 'issue' in content.lower() or 'concern' in content.lower():
+                            evaluation_areas[key]['issues'].append(content)
+                        if 'recommend' in content.lower() or 'suggest' in content.lower():
+                            evaluation_areas[key]['recommendations'].append(content)
+
+            # Calculate overall scores
+            total_score = sum(area['score'] for area in evaluation_areas.values() if area['score'] > 0)
+            score_count = sum(1 for area in evaluation_areas.values() if area['score'] > 0)
+            overall_score = total_score / score_count if score_count > 0 else 5.0
+
+            clarity = sum(1 for area in evaluation_areas.values() if area['score'] >= 8) / len(evaluation_areas) * 10
+            completeness = sum(1 for area in evaluation_areas.values() if area['score'] > 0) / len(evaluation_areas) * 10
+            risk_level = sum(len(area['issues']) for area in evaluation_areas.values()) / len(evaluation_areas) * 10
+            fairness = overall_score
+
             return {
                 'evaluation': {
-                    'overall_score': 8.5,
+                    'overall_score': round(overall_score, 1),
                     'scores': {
-                        'clarity': 8.0,
-                        'completeness': 9.0,
-                        'risk_level': 7.5,
-                        'fairness': 8.5
+                        'clarity': round(clarity, 1),
+                        'completeness': round(completeness, 1),
+                        'risk_level': round(risk_level, 1),
+                        'fairness': round(fairness, 1)
+                    },
+                    'areas': {
+                        key: {
+                            'score': area['score'],
+                            'issues': area['issues'],
+                            'recommendations': area['recommendations']
+                        } for key, area in evaluation_areas.items() if area['score'] > 0 or area['issues']
                     },
                     'recommendations': [
-                        'Consider clarifying section 3.2',
-                        'Add more specific terms in section 5'
-                    ]
+                        rec for area in evaluation_areas.values() for rec in area['recommendations']
+                    ][:5]
                 }
             }
 
