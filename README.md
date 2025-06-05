@@ -1,76 +1,128 @@
 # LegalSafeAI - Contract Analyzer
 
-**LegalSafeAI** is an AI-powered web application designed to analyze legal contracts, providing detailed insights, scores, and recommendations. With a modern, user-friendly interface, it supports multiple languages, interactive chat for contract queries, and a comprehensive analysis of contract sections. Built with Flask, JavaScript, and a sleek CSS design, LegalSafeAI is ideal for legal professionals and individuals seeking to understand contract terms.
+## Testing doc
+**doc**: https://docs.google.com/document/d/1alRaENl6eqlxsW8GewMQuo-eXE5mv4gSSUZaPyT8MGE/edit?usp=sharing
+
+## Overview
+**LegalSafeAI** is an AI-powered web application designed to analyze legal contracts, providing detailed insights, scores, and recommendations. Built with Flask, JavaScript, and modern CSS, it helps legal professionals and individuals understand contract terms through intelligent analysis.
 
 ## Features
 
-- **Contract Upload & Analysis**: Upload contracts in PDF, DOCX, or TXT format for automated analysis, including section scores, summary, detailed analysis, and evaluation.
-- **Multilingual Support**: Switch between English, Spanish, French, Italian, and German with real-time translation of UI and analysis results.
-- **Interactive Chat**: Ask questions about the contract with formatted responses (e.g., bold text, lists) powered by an AI chatbot.
-- **Modern UI**: Features a responsive sidebar, tabbed analysis results, collapsible chat panel, and enhanced score cards with hover effects.
-- **Accessible Design**: Includes ARIA attributes and keyboard navigation for improved accessibility.
-- **Chat History**: View past questions and answers for reference.
-- **Frequent Questions**: Quick access to commonly asked contract-related questions.
+- 📄 **Contract Upload & Analysis**
+  - Support for PDF, DOCX, and TXT formats
+  - Automated section scoring
+  - Comprehensive summaries
+  - Detailed analysis and evaluation
 
-## Screenshots
+- 🌍 **Multilingual Support**
+  - English, Spanish, French, Italian, German
+  - Real-time UI translation
+  - Translated analysis results
 
-![Main Interface](screenshots/main_interface.png)  
-![Chat Panel](screenshots/chat_panel.png)  
-![Analysis Tabs](screenshots/analysis_tabs.png)  
+- 💬 **Interactive Chat**
+  - AI-powered contract queries
+  - Formatted responses with markdown
+  - Chat history tracking
+  - Quick access to common questions
 
-*Note: Replace placeholders with actual screenshots.*
+- 🎨 **Modern Interface**
+  - Responsive sidebar navigation
+  - Tabbed analysis results
+  - Collapsible chat panel
+  - Enhanced score cards with hover effects
+  - Accessibility features (ARIA support)
 
 ## Prerequisites
 
 - Python 3.8+
 - Node.js (optional, for frontend development)
-- A modern web browser (Chrome, Firefox, Safari, Edge)
-- Dependencies listed in `requirements.txt`
+- Modern web browser (Chrome, Firefox, Safari, Edge)
+- Dependencies from `requirements.txt`
 
 ## Installation
 
-1. **Clone the Repository**
+1. **Clone the repository**
    ```bash
    git clone https://github.com/yourusername/legalsafeai.git
    cd legalsafeai
+   ```
 
-    Set Up a Virtual Environment
-    bash
+2. **Set up virtual environment**
+   ```bash
+   # Windows
+   python -m venv venv
+   venv\Scripts\activate
 
-python -m venv venv
-source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+   # Linux/Mac
+   python -m venv venv
+   source venv/bin/activate
+   ```
 
-Install Dependencies
-bash
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-pip install -r requirements.txt
+4. **Run the application**
+   ```bash
+   python app.py
+   ```
 
-Run the Application
-bash
+5. **Access the application**
+   - Open your browser
+   - Navigate to `http://localhost:5000`
 
-    python app.py
+## Usage
 
-    Access the Application
-    Open your browser and navigate to http://localhost:5000
+1. **Upload Contract**
+   - Click "Upload" button
+   - Select PDF, DOCX, or TXT file
+   - Wait for analysis completion
 
-Usage
+2. **View Analysis**
+   - Check dashboard for overview
+   - Navigate analysis tabs
+   - View section scores
+   - Read detailed insights
 
-    Upload a contract file (PDF, DOCX, or TXT)
+3. **Use Chat Features**
+   - Ask specific questions
+   - Reference past conversations
+   - Use quick-access common questions
 
-    View the automated analysis in the dashboard
+4. **Language Options**
+   - Select preferred language
+   - UI updates automatically
+   - Analysis translates in real-time
 
-    Interact with the AI chatbot for specific contract questions
+## Screenshots
 
-    Switch languages using the language selector
+![Main Interface](screenshots/main_interface.png)
+*Main application dashboard*
 
-    Explore analysis tabs for detailed insights
+![Chat Panel](screenshots/chat_panel.png)
+*Interactive AI chat interface*
 
-Contributing
+![Analysis Tabs](screenshots/analysis_tabs.png)
+*Detailed analysis view*
 
-Contributions are welcome! Please fork the repository and submit a pull request with your improvements.
-License
+## Contributing
 
-MIT License
-Contact
+1. Fork the repository
+2. Create feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit changes (`git commit -m 'Add AmazingFeature'`)
+4. Push to branch (`git push origin feature/AmazingFeature`)
+5. Open Pull Request
 
-For questions or support, contact: your.email@example.com
+## License
+
+Distributed under the MIT License. See `LICENSE` file for more information.
+
+## Contact
+
+Project Link: [https://github.com/yourusername/legalsafeai](https://github.com/yourusername/legalsafeai)
+
+Support Email: your.email@example.com
+
+---
+*Note: Replace placeholder images and contact information with actual content.*

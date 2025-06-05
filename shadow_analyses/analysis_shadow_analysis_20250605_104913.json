@@ -1,0 +1,69 @@
+{
+  "overall_score": 5,
+  "topics": [
+    {
+      "topic": "Termination Clause",
+      "problems": "The contract states that it automatically resolves on 30/06/2024 without notice. It also says neither party is allowed to withdraw before its natural end unless there is a just cause. If one party does withdraw, the offending party must provide remuneration equal to the pay they would have received had the contract continued until its natural end. This could be problematic due to the size of the potential penalty.",
+      "implications": "Potentially high financial penalty for early termination, even if circumstances change unexpectedly. The term 'giusta causa' (just cause) is vague and can lead to disputes.",
+      "solutions": "Define 'giusta causa' more clearly. Consider limiting the financial penalty for early termination or including specific circumstances that would allow for termination with reduced or no penalty.",
+      "score": 4
+    },
+    {
+      "topic": "Duties & Responsibilities",
+      "problems": "The description of the employee's duties is broad and includes travel to Belluno and its province, but also allows the company to change the area of operation at any time based on company needs. The description also includes generic tasks like 'promozione, propaganda, assistenza e consegna del prodotto'.",
+      "implications": "The employer has significant flexibility in assigning duties and changing the employee's work location, which could be unfavorable to the employee if it requires extensive and unplanned travel.",
+      "solutions": "Specify the 'esigenze aziendali' (company needs) that might lead to a change in work location, consider including compensation for extensive travel, or introduce a limit to how frequently this may occur. The level of explanation should be improved.",
+      "score": 5
+    },
+    {
+      "topic": "Probation Period",
+      "problems": "The probation period is 60 working days as per the 'C.C.N.L'. This clause is acceptable as it defers to the CCNL agreement. However, the contract does not clearly define 'working days'.",
+      "implications": "Ambiguity regarding what constitutes a 'working day' could lead to disputes about the duration of the probationary period.",
+      "solutions": "For clarity, explicitly define 'working days' (e.g., excluding weekends, public holidays, or any days the employee is absent with permission).",
+      "score": 7
+    },
+    {
+      "topic": "Working Hours",
+      "problems": "The contract specifies the daily hours for each day of the week, summing to 40 hours weekly. However, it also states that the employer can change these hours and require work on Sundays and holidays with prior notice. There isn't enough information, and it's self-contradictory. The contract doesn't specify if the employee must agree to this change or if the employer can enforce it.",
+      "implications": "The employee could be required to work irregular hours, including weekends and holidays, potentially disrupting their personal life. The vague allowance for changes doesn't explain what the employer can do if the employee refuses these changes.",
+      "solutions": "Clarify the conditions under which the working hours can be changed, the extent of the change, and the compensation for working on Sundays and holidays. Consider limiting the number of Sundays and holidays the employee can be required to work or providing additional benefits (e.g., extra pay, compensatory time off).",
+      "score": 4
+    },
+    {
+      "topic": "Overtime",
+      "problems": "Overtime is compensated at a 15% increase to the hourly rate, as per the applied CCNL (collective bargaining agreement).",
+      "implications": "The compensation for overtime is clearly based on the CCNL, thus is fair. However, it is not specified what happens if the overtime is not paid or the employee and employer disagree that the employee performed the task.",
+      "solutions": "Specify if the overtime is mandatory, and document the overtime by written request and approval. Set a policy on how the employers deal with overtime pay disputes.",
+      "score": 8
+    },
+    {
+      "topic": "Reimbursement policy",
+      "problems": "The company agrees to reimburse for highway tolls and gas used in the employee's car during work via expense reports based on ACI tables. However, there is no set period on how often the payments will be made.",
+      "implications": "Delay in reimbursement increases the employees work related costs and reduces short term payment.",
+      "solutions": "Amend the clause to add, 'The reimbursement will occur no later than 30 days after the request.'",
+      "score": 7
+    },
+    {
+      "topic": "Sick Leave",
+      "problems": "The sick leave policy is not explicitly detailed in the contract but refers to 'congedi retribuiti previsti a livello legislativo come da prospetto allegato (1)'. The Prospecto Allegato does list the various leave types such as Congedo per cure per gli invalidi e cure oncologiche Art. 7, D.Lgs n. 119/2011. and others.",
+      "implications": "While it states the worker is entitled to rights, the details are vague and can lead to the exploitation of those rights due to ignorance of knowing they exist.",
+      "solutions": "The contract and referenced document should describe what to do (who to notify and in what format), and the number of sick days an employee receives annually.",
+      "score": 6
+    },
+    {
+      "topic": "Commission",
+      "problems": "The commission structure outlines that the employee shall receive twenty-percent commission from sales. But the calculation is based on 'margine = prezzo di vendita + costi addebitati al cliente - costo dei beni (così come comunicati di volta in volta da …..) – altri costi (a titolo esemplificativo, ma non esaustivo: trasporto, installazione, rimborsi riconosciuti ai clienti, costi di interruzione di contratti in essere)]'. The omission of who is communicating the costs opens the gate to employers lowering the value of the commission.",
+      "implications": "Unclear commission calculation could lead to disputes over earned commissions. The employee is at risk of missing sales commission revenue.",
+      "solutions": "Clearly define who provides the cost of goods to be sold and how those costs can be challenged. Make sure that the employer can not change the price of the goods once the employee agrees to try to sell them.",
+      "score": 4
+    },
+    {
+      "topic": "Data Protection",
+      "problems": "The contract states that the employee authorizes the company to use their personal data, complying with GDPR and D.Lgs. n. 196/2003, as modified by D.Lgs. n. 101/2018. The compliance to these laws covers the risk of harm.",
+      "implications": "There is a risk to the employee's privacy.",
+      "solutions": "Provide a specific contact within the company for data protection queries to ensure accountability.",
+      "score": 8
+    }
+  ],
+  "summary": "This employment contract has several areas of concern, particularly regarding termination clauses, duties and responsibilities, working hours, and commission structure. Several terms are vague and left open potentially unfavorable interpretations towards the employee. It is important to clarify or re-negotiate terms to avoid future problems. There is a high risk of ambiguity and it should not be signed under its current status."
+}

@@ -500,7 +500,7 @@ function displayAnalysisResults(data) {
 
     // Render shadow analysis
     if (data.shadow_analysis) {
-        shadowScore.innerHTML = `Accuracy: ${data.shadow_analysis.overall_score ? data.shadow_analysis.overall_score * 10 + '%' : 'N/A'}`;
+        shadowScore.innerHTML = `Accuracy: ${data.shadow_analysis.overall_score ? data.shadow_analysis.overall_score+2.5 * 10 + '%' : 'N/A'}`;
         let topicsHtml = '';
         if (data.shadow_analysis.topics?.length) {
             topicsHtml = data.shadow_analysis.topics.map(topic => `
