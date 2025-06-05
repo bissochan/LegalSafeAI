@@ -4,8 +4,7 @@
 **doc**: https://docs.google.com/document/d/1alRaENl6eqlxsW8GewMQuo-eXE5mv4gSSUZaPyT8MGE/edit?usp=sharing
 
 ## Presentation:
-https://docs.google.com/presentation/d/13K8KsT3fGYO80pqUmcSA2d3DrmO8hhQVsecZd1pFPYY/edit?slide=id.p10#slide=id.p1
-
+https://docs.google.com/presentation/d/13K8KsT3fGYO80pqUmcSA2d3DrmO8hhQVsecZd1pFPYY/edit?slide=id.p1#slide=id.p1
 ## Overview
 **LegalSafeAI** is an AI-powered web application designed to analyze legal contracts, providing detailed insights, scores, and recommendations. Built with Flask, JavaScript, and modern CSS, it helps legal professionals and individuals understand contract terms through intelligent analysis.
 
