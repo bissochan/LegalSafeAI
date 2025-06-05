@@ -95,17 +95,6 @@
    - UI updates automatically
    - Analysis translates in real-time
 
-## Screenshots
-
-![Main Interface](screenshots/main_interface.png)
-*Main application dashboard*
-
-![Chat Panel](screenshots/chat_panel.png)
-*Interactive AI chat interface*
-
-![Analysis Tabs](screenshots/analysis_tabs.png)
-*Detailed analysis view*
-
 ## Contributing
 
 1. Fork the repository
@@ -118,11 +107,3 @@
 
 Distributed under the MIT License. See `LICENSE` file for more information.
 
-## Contact
-
-Project Link: [https://github.com/yourusername/legalsafeai](https://github.com/yourusername/legalsafeai)
-
-Support Email: your.email@example.com
-
----
-*Note: Replace placeholder images and contact information with actual content.*
